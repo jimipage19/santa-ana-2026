@@ -46,7 +46,7 @@
   .pos-badge { display: inline-block; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; margin-right: 8px; background: #2a2a2a; color: var(--muted); }
   .top2 .pos-badge { background: var(--red); color: white; }
   .pair-name { font-weight: 500; font-size: 13px; }
-  .pts-cell { font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: var(--cream) !important; }
+  .pts-cell { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 15px; color: var(--cream) !important; }
   .dif-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
   .dif-cell.pos { color: #4CAF50; }
   .dif-cell.neg { color: #ff4466; }
@@ -377,7 +377,7 @@ const SCHEDULE = [
   {j:7,group:'B',date:'09/07',a:"Ortiz / Carbayeda",b:"Iparragirre / Astiazaran"},
 ];
 
-const ADMIN_PIN = "1234";
+const ADMIN_PIN = "2010";
 const MATCH_KEY = m => `j${m.j}_${m.group}_${m.a}_${m.b}`.replace(/[\s\/]/g,'_');
 
 // ===================== STATE =====================
@@ -504,7 +504,7 @@ function renderStandings() {
       <tr class="${i<2?'top2':''}">
         <td><span class="pos-badge">${i+1}</span><span class="pair-name">${r.name}</span></td>
         <td>${r.p}</td><td>${r.w}</td><td>${r.l}</td><td>${r.tf}</td><td>${r.tc}</td>
-        <td class="dif-cell ${(r.tf-r.tc)>0?'pos':(r.tf-r.tc)<0?'neg':''}">${(r.tf-r.tc)>0?'+'+(r.tf-r.tc):(r.tf-r.tc)}</td>
+        <td class="${(r.tf-r.tc)>0?'dif-cell pos':(r.tf-r.tc)<0?'dif-cell neg':'dif-cell'}">${(r.tf-r.tc)>0?'+'+(r.tf-r.tc):(r.tf-r.tc)}</td>
         <td class="pts-cell">${r.pts}</td>
       </tr>`).join('');
   });
