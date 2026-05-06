@@ -47,6 +47,9 @@
   .top2 .pos-badge { background: var(--red); color: white; }
   .pair-name { font-weight: 500; font-size: 13px; }
   .pts-cell { font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: var(--cream) !important; }
+  .dif-cell { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
+  .dif-cell.pos { color: #4CAF50; }
+  .dif-cell.neg { color: #ff4466; }
 
   .jornada-selector { margin-bottom: 20px; }
   .jornada-selector label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--muted); display: block; margin-bottom: 8px; }
@@ -174,12 +177,12 @@
     <div class="section-sub">LIGAXKA FASEA · 7 JORNADA</div>
     <div class="group-label">A TALDEA</div>
     <table class="standings-table">
-      <thead><tr><th>Bikotea</th><th>J</th><th>W</th><th>L</th><th>TF</th><th>TC</th><th>PTS</th></tr></thead>
+      <thead><tr><th>Bikotea</th><th>J</th><th>W</th><th>L</th><th>TF</th><th>TC</th><th>DIF</th><th>PTS</th></tr></thead>
       <tbody id="standings-a"></tbody>
     </table>
     <div class="group-label">B TALDEA</div>
     <table class="standings-table">
-      <thead><tr><th>Bikotea</th><th>J</th><th>W</th><th>L</th><th>TF</th><th>TC</th><th>PTS</th></tr></thead>
+      <thead><tr><th>Bikotea</th><th>J</th><th>W</th><th>L</th><th>TF</th><th>TC</th><th>DIF</th><th>PTS</th></tr></thead>
       <tbody id="standings-b"></tbody>
     </table>
   </div>
@@ -501,6 +504,7 @@ function renderStandings() {
       <tr class="${i<2?'top2':''}">
         <td><span class="pos-badge">${i+1}</span><span class="pair-name">${r.name}</span></td>
         <td>${r.p}</td><td>${r.w}</td><td>${r.l}</td><td>${r.tf}</td><td>${r.tc}</td>
+        <td class="dif-cell ${(r.tf-r.tc)>0?'pos':(r.tf-r.tc)<0?'neg':''}">${(r.tf-r.tc)>0?'+'+(r.tf-r.tc):(r.tf-r.tc)}</td>
         <td class="pts-cell">${r.pts}</td>
       </tr>`).join('');
   });
