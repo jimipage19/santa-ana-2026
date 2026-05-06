@@ -427,14 +427,63 @@ function computeStandings(group) {
       else       { stats[m.b].w++; stats[m.b].pts+=2; stats[m.a].l++; stats[m.a].pts+=1; }
     }
   });
-  return pairs.map(p => ({name:p,...stats[p]})).sort((a,b) => {
-    if (b.pts!==a.pts) return b.pts-a.pts;
-    const h = getH2H(a.name,b.name,group);
-    if (h!==0) return h;
-    const da=a.tf-a.tc, db2=b.tf-b.tc;
-    if (db2!==da) return db2-da;
-    return (b.p>0?b.tf/b.p:0)-(a.p>0?a.tf/a.p:0);
+
+  const rows = pairs.map(p => ({name:p,...stats[p]}));
+
+  // Group by points, then apply tiebreakers within each group
+  const byPts = {};
+  rows.forEach(r => {
+    if (!byPts[r.pts]) byPts[r.pts] = [];
+    byPts[r.pts].push(r);
   });
+
+  function h2hStatsAmong(tiedNames, group) {
+    // compute tf/tc only from matches played among the tied set
+    const h = {};
+    tiedNames.forEach(n => h[n] = {tf:0,tc:0,pts:0});
+    SCHEDULE.filter(m => m.group===group && tiedNames.includes(m.a) && tiedNames.includes(m.b)).forEach(m => {
+      const r = results[MATCH_KEY(m)];
+      if (!r) return;
+      const {sa,sb} = r;
+      h[m.a].tf+=sa; h[m.a].tc+=sb;
+      h[m.b].tf+=sb; h[m.b].tc+=sa;
+      if (sa>sb) { h[m.a].pts+=2; h[m.b].pts+=1; }
+      else       { h[m.b].pts+=2; h[m.a].pts+=1; }
+    });
+    return h;
+  }
+
+  function sortTied(tied, group) {
+    if (tied.length <= 1) return tied;
+    const names = tied.map(r => r.name);
+    const h = h2hStatsAmong(names, group);
+
+    // Check if h2h points all equal (circular tie)
+    const hPts = names.map(n => h[n].pts);
+    const allHPtsEqual = hPts.every(p => p === hPts[0]);
+
+    return tied.sort((a, b) => {
+      // 1. overall points (already equal in this group)
+      // 2. h2h points among tied (only meaningful if not all equal)
+      if (!allHPtsEqual) {
+        if (h[b.name].pts !== h[a.name].pts) return h[b.name].pts - h[a.name].pts;
+      }
+      // 3. h2h tantos difference among tied
+      const da = h[a.name].tf - h[a.name].tc;
+      const db2 = h[b.name].tf - h[b.name].tc;
+      if (db2 !== da) return db2 - da;
+      // 4. overall tantos average
+      return (b.p>0?b.tf/b.p:0) - (a.p>0?a.tf/a.p:0);
+    });
+  }
+
+  // Sort each points group internally, then flatten
+  const sorted = [];
+  Object.keys(byPts).map(Number).sort((a,b)=>b-a).forEach(pts => {
+    const tied = sortTied(byPts[pts], group);
+    sorted.push(...tied);
+  });
+  return sorted;
 }
 
 function getH2H(pA,pB,group) {
