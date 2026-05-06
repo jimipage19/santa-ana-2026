@@ -472,8 +472,8 @@ function computeStandings(group) {
       const da = h[a.name].tf - h[a.name].tc;
       const db2 = h[b.name].tf - h[b.name].tc;
       if (db2 !== da) return db2 - da;
-      // 4. overall tantos average
-      return (b.p>0?b.tf/b.p:0) - (a.p>0?a.tf/a.p:0);
+      // 4. overall tantos difference
+      return (b.tf-b.tc) - (a.tf-a.tc);
     });
   }
 
