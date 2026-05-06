@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="eu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Santa Ana Pala Txapelketa 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #C8102E; --red-dark: #8B0018; --red-light: #FF2244;
+    --cream: #F5F0E8; --cream-dark: #E8E0D0;
+    --black: #0A0A0A; --dark: #1A1A1A; --mid: #444; --muted: #888; --white: #fff;
+    --gold: #C9A84C; --green: #1A7A3A;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'IBM Plex Sans', sans-serif; background: var(--black); color: var(--cream); min-height: 100vh; }
+
+  .header { background: var(--red); padding: 16px 20px 12px; position: sticky; top: 0; z-index: 100; border-bottom: 3px solid var(--red-dark); }
+  .header-inner { max-width: 600px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; color: var(--white); line-height: 1; }
+  .header h1 span { display: block; font-size: 11px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 3px; color: rgba(255,255,255,0.7); font-weight: 400; margin-top: 2px; }
+  .admin-btn { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.3); color: white; font-size: 11px; font-family: 'IBM Plex Mono', monospace; padding: 6px 12px; border-radius: 4px; cursor: pointer; letter-spacing: 1px; }
+
+  .nav { background: var(--dark); border-bottom: 1px solid #333; }
+  .nav-inner { max-width: 600px; margin: 0 auto; display: flex; }
+  .nav-tab { flex: 1; padding: 12px 8px; text-align: center; font-size: 11px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 1.5px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; text-transform: uppercase; }
+  .nav-tab.active { color: var(--red-light); border-bottom-color: var(--red-light); }
+  .nav-tab:hover:not(.active) { color: var(--cream); }
+
+  .main { max-width: 600px; margin: 0 auto; padding: 20px 16px 40px; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .section-title { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 3px; color: var(--cream); margin-bottom: 4px; }
+  .section-sub { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 2px; margin-bottom: 20px; }
+
+  .group-label { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 4px; color: var(--red-light); margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #333; }
+  .standings-table { width: 100%; border-collapse: collapse; }
+  .standings-table th { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1px; color: var(--muted); padding: 6px 8px; text-align: right; border-bottom: 1px solid #333; }
+  .standings-table th:first-child { text-align: left; }
+  .standings-table td { padding: 10px 8px; font-size: 13px; text-align: right; border-bottom: 1px solid #1e1e1e; color: var(--cream-dark); }
+  .standings-table td:first-child { text-align: left; }
+  .standings-table tr:hover td { background: #1a1a1a; }
+  .standings-table tr.top2 td { color: var(--cream); }
+  .standings-table tr.top2 td:first-child { color: var(--gold); font-weight: 600; }
+  .pos-badge { display: inline-block; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; margin-right: 8px; background: #2a2a2a; color: var(--muted); }
+  .top2 .pos-badge { background: var(--red); color: white; }
+  .pair-name { font-weight: 500; font-size: 13px; }
+  .pts-cell { font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: var(--cream) !important; }
+
+  .jornada-selector { margin-bottom: 20px; }
+  .jornada-selector label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--muted); display: block; margin-bottom: 8px; }
+  .jornada-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .jornada-btn { font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 8px 14px; background: #1a1a1a; border: 1px solid #333; color: var(--muted); border-radius: 4px; cursor: pointer; transition: all 0.15s; letter-spacing: 1px; }
+  .jornada-btn.active { background: var(--red); border-color: var(--red); color: white; }
+  .jornada-btn:hover:not(.active) { border-color: var(--muted); color: var(--cream); }
+
+  .partidos-list { display: flex; flex-direction: column; gap: 10px; }
+  .partido-card { background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 14px 16px; }
+  .partido-card.jugado { border-left: 3px solid var(--green); }
+  .partido-card.pending { border-left: 3px solid #333; }
+  .partido-meta { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .partido-equipos { display: flex; align-items: center; gap: 8px; }
+  .equipo-name { font-size: 13px; font-weight: 500; flex: 1; color: var(--cream); }
+  .equipo-name.right { text-align: right; }
+  .resultado-display { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; color: var(--gold); text-align: center; min-width: 60px; }
+  .btn-apuntar { display: block; width: 100%; margin-top: 12px; background: transparent; border: 1px solid #444; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px; padding: 8px; border-radius: 4px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+  .btn-apuntar:hover { border-color: var(--red-light); color: var(--red-light); }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--dark); border: 1px solid #333; border-radius: 12px; width: 100%; max-width: 400px; padding: 24px; }
+  .modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; margin-bottom: 4px; }
+  .modal-sub { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 2px; margin-bottom: 20px; }
+  .modal-match { background: #111; border-radius: 8px; padding: 14px; margin-bottom: 20px; }
+  .modal-match-names { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .modal-pair { flex: 1; font-size: 12px; font-weight: 500; color: var(--cream); }
+  .modal-pair.right { text-align: right; }
+  .modal-vs { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); }
+  .score-inputs { display: flex; align-items: center; gap: 12px; }
+  .score-input-wrap { flex: 1; text-align: center; }
+  .score-input-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-bottom: 6px; }
+  .score-input { width: 100%; padding: 12px 8px; background: #1a1a1a; border: 1px solid #444; border-radius: 6px; color: var(--cream); font-family: 'Bebas Neue', sans-serif; font-size: 28px; text-align: center; outline: none; letter-spacing: 2px; -moz-appearance: textfield; }
+  .score-input::-webkit-outer-spin-button, .score-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .score-input:focus { border-color: var(--red); }
+  .score-dash { font-family: 'Bebas Neue', sans-serif; font-size: 24px; color: var(--muted); }
+  .error-msg { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #ff4466; margin-bottom: 12px; min-height: 16px; }
+  .modal-btns { display: flex; gap: 10px; }
+  .btn-cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid #444; color: var(--muted); border-radius: 6px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; }
+  .btn-cancel:hover { border-color: #666; color: var(--cream); }
+  .btn-confirm { flex: 2; padding: 12px; background: var(--red); border: none; color: white; border-radius: 6px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; font-weight: 600; }
+  .btn-confirm:hover { background: var(--red-light); }
+  .btn-confirm:disabled { background: #444; color: var(--muted); cursor: not-allowed; }
+
+  .confirm-box { background: #0d1a10; border: 1px solid var(--green); border-radius: 10px; padding: 20px; margin-bottom: 20px; text-align: center; }
+  .confirm-score { font-family: 'Bebas Neue', sans-serif; font-size: 40px; letter-spacing: 4px; color: var(--gold); }
+  .confirm-teams { font-size: 13px; color: var(--cream-dark); margin-bottom: 4px; }
+  .confirm-winner { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #4CAF50; letter-spacing: 2px; margin-top: 8px; }
+
+  .admin-panel { background: #111; border: 1px solid #333; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  .admin-panel h3 { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px; margin-bottom: 14px; color: var(--red-light); }
+  .form-row { margin-bottom: 14px; }
+  .form-row label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--muted); display: block; margin-bottom: 6px; }
+  .form-row select, .form-row input[type=number] { width: 100%; padding: 10px 12px; background: #1a1a1a; border: 1px solid #444; border-radius: 6px; color: var(--cream); font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; outline: none; }
+  .form-row select:focus, .form-row input:focus { border-color: var(--red); }
+  .form-row select option { background: #1a1a1a; }
+  .score-row { display: flex; gap: 12px; }
+  .score-row .form-row { flex: 1; }
+  .btn-save { width: 100%; padding: 12px; background: var(--red); border: none; color: white; border-radius: 6px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 2px; margin-top: 6px; font-weight: 600; }
+  .btn-save:hover { background: var(--red-light); }
+  .btn-delete { background: #1a0a0a; border: 1px solid #5a2020; color: #ff6666; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+  .btn-delete:hover { background: #2a1010; }
+  .results-log { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+  .log-item { background: #1a1a1a; border-radius: 6px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .log-match { font-size: 12px; color: var(--cream-dark); flex: 1; }
+  .log-score { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px; color: var(--gold); }
+
+  .admin-lock { text-align: center; padding: 40px 20px; }
+  .admin-lock h2 { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 3px; margin-bottom: 8px; }
+  .admin-lock p { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 1px; margin-bottom: 24px; }
+  .pin-input { width: 160px; padding: 14px; text-align: center; background: #1a1a1a; border: 1px solid #444; border-radius: 8px; color: var(--cream); font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 6px; outline: none; display: block; margin: 0 auto 12px; }
+  .pin-input:focus { border-color: var(--red); }
+  .btn-unlock { padding: 12px 32px; background: var(--red); border: none; color: white; border-radius: 6px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 2px; }
+
+  .bracket-section { margin-bottom: 28px; }
+  .bracket-section h3 { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 3px; color: var(--red-light); margin-bottom: 12px; }
+  .bracket-match { background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+  .bracket-match.jugado { border-left: 3px solid var(--green); }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--green); color: white; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; padding: 12px 24px; border-radius: 6px; opacity: 0; transition: opacity 0.3s; z-index: 300; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+  .toast.error { background: #8B0018; }
+
+  .empty-state { text-align: center; padding: 40px 20px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+
+  .pair-selector-bar { background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+  .pair-selector-bar label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 2px; white-space: nowrap; }
+  .pair-selector-bar select { flex: 1; padding: 8px 10px; background: #1a1a1a; border: 1px solid #444; border-radius: 6px; color: var(--cream); font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; outline: none; }
+
+  .loading-overlay { position: fixed; inset: 0; background: var(--black); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 500; gap: 16px; transition: opacity 0.3s; }
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #333; border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); letter-spacing: 2px; }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">KARGATZEN...</div>
+</div>
+
+<div class="header">
+  <div class="header-inner">
+    <h1>Santa Ana<span>PALA TXAPELKETA · 2026</span></h1>
+    <button class="admin-btn" onclick="showAdminLogin()">ADMIN</button>
+  </div>
+</div>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-tab active" onclick="switchView('clasificacion')">SAILKAP.</div>
+    <div class="nav-tab" onclick="switchView('partidos')">PARTIDAK</div>
+    <div class="nav-tab" onclick="switchView('bracket')">FINALA</div>
+    <div class="nav-tab" id="admin-tab" style="display:none" onclick="switchView('admin')">ADMIN</div>
+  </div>
+</nav>
+
+<div class="main">
+
+  <div class="view active" id="view-clasificacion">
+    <div class="section-title">Sailkapena</div>
+    <div class="section-sub">LIGAXKA FASEA · 7 JORNADA</div>
+    <div class="group-label">A TALDEA</div>
+    <table class="standings-table">
+      <thead><tr><th>Bikotea</th><th>J</th><th>W</th><th>L</th><th>TF</th><th>TC</th><th>PTS</th></tr></thead>
+      <tbody id="standings-a"></tbody>
+    </table>
+    <div class="group-label">B TALDEA</div>
+    <table class="standings-table">
+      <thead><tr><th>Bikotea</th><th>J</th><th>W</th><th>L</th><th>TF</th><th>TC</th><th>PTS</th></tr></thead>
+      <tbody id="standings-b"></tbody>
+    </table>
+  </div>
+
+  <div class="view" id="view-partidos">
+    <div class="section-title">Partidak</div>
+    <div class="section-sub">EMAITZAK SARTU</div>
+    <div class="pair-selector-bar">
+      <label>BIKOTEA</label>
+      <select id="pair-filter" onchange="renderPartidos()">
+        <option value="">— Denak ikusi —</option>
+      </select>
+    </div>
+    <div class="jornada-selector">
+      <label>JARDUNALDIA</label>
+      <div class="jornada-btns" id="jornada-btns"></div>
+    </div>
+    <div class="partidos-list" id="partidos-list"></div>
+  </div>
+
+  <div class="view" id="view-bracket">
+    <div class="section-title">Azken Fasea</div>
+    <div class="section-sub">FINALERDIAK ETA FINALA</div>
+    <div id="bracket-content"></div>
+  </div>
+
+  <div class="view" id="view-admin">
+    <div id="admin-lock-screen" class="admin-lock">
+      <h2>ADMIN SARRERA</h2>
+      <p>Sartu pasahitza</p>
+      <input type="password" class="pin-input" id="admin-pin" placeholder="····" maxlength="6"
+        onkeydown="if(event.key==='Enter') checkAdmin()">
+      <br>
+      <button class="btn-unlock" onclick="checkAdmin()">SARTU</button>
+      <div id="pin-error" style="color:#ff4466;font-family:'IBM Plex Mono',monospace;font-size:11px;margin-top:12px;"></div>
+    </div>
+    <div id="admin-content" style="display:none">
+      <div class="section-title">Admin Panel</div>
+      <div class="section-sub">EMAITZAK KUDEATU</div>
+      <div class="admin-panel">
+        <h3>Emaitza sartu / aldatu</h3>
+        <div class="form-row">
+          <label>PARTIDA</label>
+          <select id="admin-match-sel" onchange="fillAdminScore()">
+            <option value="">— Aukeratu partida —</option>
+          </select>
+        </div>
+        <div class="score-row">
+          <div class="form-row"><label id="admin-label-a">LOCAL</label><input type="number" id="admin-score-a" min="0" max="25" placeholder="0"></div>
+          <div class="form-row"><label id="admin-label-b">BISITARI</label><input type="number" id="admin-score-b" min="0" max="25" placeholder="0"></div>
+        </div>
+        <button class="btn-save" onclick="adminSaveResult()">GORDE</button>
+      </div>
+      <div class="admin-panel">
+        <h3>Sartutako emaitzak</h3>
+        <div class="results-log" id="results-log"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div id="modal-input-view">
+      <div class="modal-title">EMAITZA SARTU</div>
+      <div class="modal-sub" id="modal-jornada-label">1. JARDUNALDIA</div>
+      <div class="modal-match">
+        <div class="modal-match-names">
+          <div class="modal-pair" id="modal-pair-a">—</div>
+          <div class="modal-vs">VS</div>
+          <div class="modal-pair right" id="modal-pair-b">—</div>
+        </div>
+        <div class="score-inputs">
+          <div class="score-input-wrap">
+            <div class="score-input-label" id="modal-label-a">LOCAL</div>
+            <input type="number" class="score-input" id="modal-score-a" min="0" max="25" placeholder="0" inputmode="numeric">
+          </div>
+          <div class="score-dash">–</div>
+          <div class="score-input-wrap">
+            <div class="score-input-label" id="modal-label-b">BISITARI</div>
+            <input type="number" class="score-input" id="modal-score-b" min="0" max="25" placeholder="0" inputmode="numeric">
+          </div>
+        </div>
+      </div>
+      <div class="error-msg" id="modal-error"></div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal()">UTZI</button>
+        <button class="btn-confirm" onclick="validateAndConfirm()">HURRENGOA →</button>
+      </div>
+    </div>
+    <div id="modal-confirm-view" style="display:none">
+      <div class="modal-title">BERRETSI</div>
+      <div class="modal-sub">EMAITZA ZUZENA DA?</div>
+      <div class="confirm-box">
+        <div class="confirm-teams" id="confirm-teams-text">—</div>
+        <div class="confirm-score" id="confirm-score-text">— – —</div>
+        <div class="confirm-winner" id="confirm-winner-text">—</div>
+      </div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="backToInput()">← ATZERA</button>
+        <button class="btn-confirm" id="btn-save-final" onclick="saveResult()">✓ GORDE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD10AS8ydXP_fpz8aYhCSFR6cbV0Ji0_gs",
+  authDomain: "santa-ana-txapelketa-2026.firebaseapp.com",
+  projectId: "santa-ana-txapelketa-2026",
+  storageBucket: "santa-ana-txapelketa-2026.firebasestorage.app",
+  messagingSenderId: "503069400352",
+  appId: "1:503069400352:web:fdb0d1c10aede109c18b45"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ===================== DATA =====================
+const GROUPS = {
+  A: ["Zarra / Martin","Mendizabal / Urruzmendi","Begiristain / Castro","Eleizegi / Gonzalez",
+      "Arrondo / Goikoetxea","Etxezarreta / Sorrondegi","Izquierdo / Larretxea","Kortajarena / G. Arteaga"],
+  B: ["Bueno / Urkola","Artetxe / Artetxe","Arruti / Errasti","Rekondo / Bazkez",
+      "Ortiz / Carbayeda","Iparragirre / Astiazaran","Jauregi / J.M. Arteaga","Odriozola / Ollokiegi"]
+};
+const ALL_PAIRS = [...GROUPS.A, ...GROUPS.B];
+
+const SCHEDULE = [
+  {j:1,group:'A',date:'11/05',a:"Zarra / Martin",b:"Kortajarena / G. Arteaga"},
+  {j:1,group:'A',date:'11/05',a:"Mendizabal / Urruzmendi",b:"Izquierdo / Larretxea"},
+  {j:1,group:'B',date:'12/05',a:"Bueno / Urkola",b:"Odriozola / Ollokiegi"},
+  {j:1,group:'B',date:'12/05',a:"Artetxe / Artetxe",b:"Jauregi / J.M. Arteaga"},
+  {j:1,group:'A',date:'13/05',a:"Begiristain / Castro",b:"Etxezarreta / Sorrondegi"},
+  {j:1,group:'A',date:'13/05',a:"Eleizegi / Gonzalez",b:"Arrondo / Goikoetxea"},
+  {j:1,group:'B',date:'14/05',a:"Arruti / Errasti",b:"Iparragirre / Astiazaran"},
+  {j:1,group:'B',date:'14/05',a:"Rekondo / Bazkez",b:"Ortiz / Carbayeda"},
+  {j:2,group:'A',date:'18/05',a:"Zarra / Martin",b:"Izquierdo / Larretxea"},
+  {j:2,group:'A',date:'18/05',a:"Kortajarena / G. Arteaga",b:"Etxezarreta / Sorrondegi"},
+  {j:2,group:'B',date:'19/05',a:"Bueno / Urkola",b:"Jauregi / J.M. Arteaga"},
+  {j:2,group:'B',date:'19/05',a:"Odriozola / Ollokiegi",b:"Iparragirre / Astiazaran"},
+  {j:2,group:'A',date:'20/05',a:"Mendizabal / Urruzmendi",b:"Arrondo / Goikoetxea"},
+  {j:2,group:'A',date:'20/05',a:"Begiristain / Castro",b:"Eleizegi / Gonzalez"},
+  {j:2,group:'B',date:'21/05',a:"Artetxe / Artetxe",b:"Ortiz / Carbayeda"},
+  {j:2,group:'B',date:'21/05',a:"Arruti / Errasti",b:"Rekondo / Bazkez"},
+  {j:3,group:'A',date:'25/05',a:"Zarra / Martin",b:"Etxezarreta / Sorrondegi"},
+  {j:3,group:'A',date:'25/05',a:"Izquierdo / Larretxea",b:"Arrondo / Goikoetxea"},
+  {j:3,group:'B',date:'26/05',a:"Bueno / Urkola",b:"Iparragirre / Astiazaran"},
+  {j:3,group:'B',date:'26/05',a:"Jauregi / J.M. Arteaga",b:"Ortiz / Carbayeda"},
+  {j:3,group:'A',date:'27/05',a:"Kortajarena / G. Arteaga",b:"Eleizegi / Gonzalez"},
+  {j:3,group:'A',date:'27/05',a:"Mendizabal / Urruzmendi",b:"Begiristain / Castro"},
+  {j:3,group:'B',date:'28/05',a:"Odriozola / Ollokiegi",b:"Rekondo / Bazkez"},
+  {j:3,group:'B',date:'28/05',a:"Artetxe / Artetxe",b:"Arruti / Errasti"},
+  {j:4,group:'A',date:'01/06',a:"Zarra / Martin",b:"Arrondo / Goikoetxea"},
+  {j:4,group:'A',date:'01/06',a:"Etxezarreta / Sorrondegi",b:"Eleizegi / Gonzalez"},
+  {j:4,group:'B',date:'02/06',a:"Bueno / Urkola",b:"Ortiz / Carbayeda"},
+  {j:4,group:'B',date:'02/06',a:"Iparragirre / Astiazaran",b:"Rekondo / Bazkez"},
+  {j:4,group:'A',date:'03/06',a:"Izquierdo / Larretxea",b:"Begiristain / Castro"},
+  {j:4,group:'A',date:'03/06',a:"Kortajarena / G. Arteaga",b:"Mendizabal / Urruzmendi"},
+  {j:4,group:'B',date:'04/06',a:"Jauregi / J.M. Arteaga",b:"Arruti / Errasti"},
+  {j:4,group:'B',date:'04/06',a:"Odriozola / Ollokiegi",b:"Artetxe / Artetxe"},
+  {j:5,group:'A',date:'15/06',a:"Zarra / Martin",b:"Eleizegi / Gonzalez"},
+  {j:5,group:'A',date:'15/06',a:"Arrondo / Goikoetxea",b:"Begiristain / Castro"},
+  {j:5,group:'B',date:'16/06',a:"Bueno / Urkola",b:"Rekondo / Bazkez"},
+  {j:5,group:'B',date:'16/06',a:"Ortiz / Carbayeda",b:"Arruti / Errasti"},
+  {j:5,group:'A',date:'17/06',a:"Etxezarreta / Sorrondegi",b:"Mendizabal / Urruzmendi"},
+  {j:5,group:'A',date:'17/06',a:"Izquierdo / Larretxea",b:"Kortajarena / G. Arteaga"},
+  {j:5,group:'B',date:'18/06',a:"Iparragirre / Astiazaran",b:"Artetxe / Artetxe"},
+  {j:5,group:'B',date:'18/06',a:"Jauregi / J.M. Arteaga",b:"Odriozola / Ollokiegi"},
+  {j:6,group:'A',date:'22/06',a:"Zarra / Martin",b:"Begiristain / Castro"},
+  {j:6,group:'A',date:'22/06',a:"Eleizegi / Gonzalez",b:"Mendizabal / Urruzmendi"},
+  {j:6,group:'B',date:'23/06',a:"Bueno / Urkola",b:"Arruti / Errasti"},
+  {j:6,group:'B',date:'23/06',a:"Rekondo / Bazkez",b:"Artetxe / Artetxe"},
+  {j:6,group:'A',date:'01/07',a:"Arrondo / Goikoetxea",b:"Kortajarena / G. Arteaga"},
+  {j:6,group:'A',date:'01/07',a:"Etxezarreta / Sorrondegi",b:"Izquierdo / Larretxea"},
+  {j:6,group:'B',date:'02/07',a:"Ortiz / Carbayeda",b:"Odriozola / Ollokiegi"},
+  {j:6,group:'B',date:'02/07',a:"Iparragirre / Astiazaran",b:"Jauregi / J.M. Arteaga"},
+  {j:7,group:'A',date:'06/07',a:"Zarra / Martin",b:"Mendizabal / Urruzmendi"},
+  {j:7,group:'A',date:'06/07',a:"Begiristain / Castro",b:"Kortajarena / G. Arteaga"},
+  {j:7,group:'B',date:'07/07',a:"Bueno / Urkola",b:"Artetxe / Artetxe"},
+  {j:7,group:'B',date:'07/07',a:"Arruti / Errasti",b:"Odriozola / Ollokiegi"},
+  {j:7,group:'A',date:'08/07',a:"Eleizegi / Gonzalez",b:"Izquierdo / Larretxea"},
+  {j:7,group:'A',date:'08/07',a:"Arrondo / Goikoetxea",b:"Etxezarreta / Sorrondegi"},
+  {j:7,group:'B',date:'09/07',a:"Rekondo / Bazkez",b:"Jauregi / J.M. Arteaga"},
+  {j:7,group:'B',date:'09/07',a:"Ortiz / Carbayeda",b:"Iparragirre / Astiazaran"},
+];
+
+const ADMIN_PIN = "1234";
+const MATCH_KEY = m => `j${m.j}_${m.group}_${m.a}_${m.b}`.replace(/[\s\/]/g,'_');
+
+// ===================== STATE =====================
+let results = {};
+let knockoutResults = {};
+let selectedJornada = 1;
+let currentMatch = null;
+let adminUnlocked = false;
+
+// ===================== FIREBASE =====================
+function initFirebase() {
+  onSnapshot(collection(db, 'results'), snap => {
+    results = {};
+    snap.forEach(d => { results[d.id] = d.data(); });
+    renderAll();
+    document.getElementById('loading-overlay').classList.add('hidden');
+  }, err => {
+    showToast('Konexio errorea', true);
+    document.getElementById('loading-overlay').classList.add('hidden');
+  });
+
+  onSnapshot(collection(db, 'knockout'), snap => {
+    knockoutResults = {};
+    snap.forEach(d => { knockoutResults[d.id] = d.data(); });
+    renderBracket();
+    if (adminUnlocked) renderAdminLog();
+  });
+}
+
+async function fbSet(col, id, data) {
+  await setDoc(doc(db, col, id), data);
+}
+async function fbDel(col, id) {
+  await deleteDoc(doc(db, col, id));
+}
+
+// ===================== STANDINGS =====================
+function computeStandings(group) {
+  const pairs = GROUPS[group];
+  const stats = {};
+  pairs.forEach(p => stats[p] = {p:0,w:0,l:0,tf:0,tc:0,pts:0});
+  SCHEDULE.filter(m => m.group===group).forEach(m => {
+    const r = results[MATCH_KEY(m)];
+    if (r) {
+      const {sa,sb} = r;
+      stats[m.a].p++; stats[m.b].p++;
+      stats[m.a].tf+=sa; stats[m.a].tc+=sb;
+      stats[m.b].tf+=sb; stats[m.b].tc+=sa;
+      if (sa>sb) { stats[m.a].w++; stats[m.a].pts+=2; stats[m.b].l++; stats[m.b].pts+=1; }
+      else       { stats[m.b].w++; stats[m.b].pts+=2; stats[m.a].l++; stats[m.a].pts+=1; }
+    }
+  });
+  return pairs.map(p => ({name:p,...stats[p]})).sort((a,b) => {
+    if (b.pts!==a.pts) return b.pts-a.pts;
+    const h = getH2H(a.name,b.name,group);
+    if (h!==0) return h;
+    const da=a.tf-a.tc, db2=b.tf-b.tc;
+    if (db2!==da) return db2-da;
+    return (b.p>0?b.tf/b.p:0)-(a.p>0?a.tf/a.p:0);
+  });
+}
+
+function getH2H(pA,pB,group) {
+  const m = SCHEDULE.find(m => m.group===group&&((m.a===pA&&m.b===pB)||(m.a===pB&&m.b===pA)));
+  if (!m) return 0;
+  const r = results[MATCH_KEY(m)];
+  if (!r) return 0;
+  return m.a===pA ? r.sb-r.sa : r.sa-r.sb;
+}
+
+function renderStandings() {
+  ['A','B'].forEach(g => {
+    const rows = computeStandings(g);
+    document.getElementById(`standings-${g.toLowerCase()}`).innerHTML = rows.map((r,i) => `
+      <tr class="${i<2?'top2':''}">
+        <td><span class="pos-badge">${i+1}</span><span class="pair-name">${r.name}</span></td>
+        <td>${r.p}</td><td>${r.w}</td><td>${r.l}</td><td>${r.tf}</td><td>${r.tc}</td>
+        <td class="pts-cell">${r.pts}</td>
+      </tr>`).join('');
+  });
+}
+
+// ===================== PARTIDOS =====================
+function initJornadaBtns() {
+  const cont = document.getElementById('jornada-btns');
+  cont.innerHTML = '';
+  for (let j=1;j<=7;j++) {
+    const btn = document.createElement('button');
+    btn.className = 'jornada-btn'+(j===selectedJornada?' active':'');
+    btn.textContent = j;
+    btn.onclick = () => { selectedJornada=j; initJornadaBtns(); renderPartidos(); };
+    cont.appendChild(btn);
+  }
+}
+
+function initPairSelector() {
+  const sel = document.getElementById('pair-filter');
+  ALL_PAIRS.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value=p; opt.textContent=p; sel.appendChild(opt);
+  });
+}
+
+function renderPartidos() {
+  const pf = document.getElementById('pair-filter').value;
+  let matches = SCHEDULE.filter(m => m.j===selectedJornada);
+  if (pf) matches = matches.filter(m => m.a===pf||m.b===pf);
+  const cont = document.getElementById('partidos-list');
+  if (!matches.length) { cont.innerHTML='<div class="empty-state">Partidarik ez jardunaldi honetan</div>'; return; }
+  cont.innerHTML = matches.map(m => {
+    const key=MATCH_KEY(m), res=results[key], jugado=!!res;
+    return `<div class="partido-card ${jugado?'jugado':'pending'}">
+      <div class="partido-meta"><span>${m.group} TALDEA · ${m.date}</span><span>${jugado?'✓ JOKATU':'PENDIENTE'}</span></div>
+      <div class="partido-equipos">
+        <div class="equipo-name">${m.a}</div>
+        <div class="resultado-display">${jugado?`${res.sa}–${res.sb}`:'·–·'}</div>
+        <div class="equipo-name right">${m.b}</div>
+      </div>
+      ${!jugado?`<button class="btn-apuntar" onclick='openModal(${JSON.stringify(m)})'>+ EMAITZA SARTU</button>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ===================== MODAL =====================
+window.openModal = m => {
+  currentMatch = m;
+  document.getElementById('modal-pair-a').textContent = m.a;
+  document.getElementById('modal-pair-b').textContent = m.b;
+  document.getElementById('modal-label-a').textContent = m.a.split(' / ')[0].toUpperCase();
+  document.getElementById('modal-label-b').textContent = m.b.split(' / ')[0].toUpperCase();
+  document.getElementById('modal-jornada-label').textContent = `${m.j}. JARDUNALDIA · ${m.date}`;
+  document.getElementById('modal-score-a').value = '';
+  document.getElementById('modal-score-b').value = '';
+  document.getElementById('modal-error').textContent = '';
+  document.getElementById('modal-input-view').style.display = 'block';
+  document.getElementById('modal-confirm-view').style.display = 'none';
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('modal-score-a').focus(), 100);
+};
+
+window.closeModal = () => {
+  document.getElementById('modal-overlay').classList.remove('open');
+  currentMatch = null;
+};
+
+window.validateAndConfirm = () => {
+  const sa = parseInt(document.getElementById('modal-score-a').value);
+  const sb = parseInt(document.getElementById('modal-score-b').value);
+  const err = document.getElementById('modal-error');
+  if (isNaN(sa)||isNaN(sb))    { err.textContent='⚠ Sartu bi emaitzak'; return; }
+  if (sa<0||sb<0)              { err.textContent='⚠ Ezin negatibo'; return; }
+  if (sa>25||sb>25)            { err.textContent='⚠ Gehienez 25 tanto'; return; }
+  if (sa===sb)                 { err.textContent='⚠ Ezin berdinketa — batek 25 behar du'; return; }
+  if (sa!==25&&sb!==25)        { err.textContent='⚠ Batek 25 tanto egin behar ditu'; return; }
+  err.textContent = '';
+  const winner = sa>sb ? currentMatch.a : currentMatch.b;
+  document.getElementById('confirm-teams-text').textContent = `${currentMatch.a}  vs  ${currentMatch.b}`;
+  document.getElementById('confirm-score-text').textContent = `${sa} – ${sb}`;
+  document.getElementById('confirm-winner-text').textContent = `✓ IRABAZLEA: ${winner}`;
+  document.getElementById('modal-input-view').style.display = 'none';
+  document.getElementById('modal-confirm-view').style.display = 'block';
+};
+
+window.backToInput = () => {
+  document.getElementById('modal-input-view').style.display = 'block';
+  document.getElementById('modal-confirm-view').style.display = 'none';
+};
+
+window.saveResult = async () => {
+  if (!currentMatch) return;
+  const sa = parseInt(document.getElementById('modal-score-a').value);
+  const sb = parseInt(document.getElementById('modal-score-b').value);
+  const btn = document.getElementById('btn-save-final');
+  btn.disabled=true; btn.textContent='GORDETZEN...';
+  try {
+    await fbSet('results', MATCH_KEY(currentMatch), {
+      sa, sb,
+      matchA: currentMatch.a, matchB: currentMatch.b,
+      jornada: currentMatch.j, date: currentMatch.date
+    });
+    closeModal();
+    showToast('Emaitza gordeta ✓');
+  } catch(e) {
+    showToast('Errorea: '+e.message, true);
+  }
+  btn.disabled=false; btn.textContent='✓ GORDE';
+};
+
+// ===================== BRACKET =====================
+function getTopPairs() {
+  return {
+    topA: computeStandings('A').slice(0,2).map(r=>r.name),
+    topB: computeStandings('B').slice(0,2).map(r=>r.name)
+  };
+}
+
+function renderBracket() {
+  const {topA,topB} = getTopPairs();
+  const a1=topA[0]||'A Taldeko 1.', a2=topA[1]||'A Taldeko 2.';
+  const b1=topB[0]||'B Taldeko 1.', b2=topB[1]||'B Taldeko 2.';
+  const sf1=knockoutResults['sf1'], sf2=knockoutResults['sf2'], fin=knockoutResults['final'];
+  const sf1Win = sf1?(sf1.sa>sf1.sb?a1:b2):'?';
+  const sf2Win = sf2?(sf2.sa>sf2.sb?b1:a2):'?';
+  const done = SCHEDULE.filter(m=>results[MATCH_KEY(m)]).length;
+
+  document.getElementById('bracket-content').innerHTML = `
+    ${done<SCHEDULE.length?`<div style="background:#1a1200;border:1px solid #5a4000;border-radius:8px;padding:14px;margin-bottom:20px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#c9a84c;letter-spacing:1px;">⏳ Ligaxka ez da bukatu — ${done}/${SCHEDULE.length} partida jokatu dira</div>`:''}
+    <div class="bracket-section">
+      <h3>FINALERDIAK</h3>
+      ${bCard(a1,b2,sf1,'1. Finalerdia · A1 vs B2')}
+      ${bCard(b1,a2,sf2,'2. Finalerdia · B1 vs A2')}
+    </div>
+    <div class="bracket-section">
+      <h3>FINALA</h3>
+      ${bCard(sf1Win,sf2Win,fin,'FINALA')}
+    </div>
+    ${fin?`<div style="background:#0d1a10;border:1px solid #1a7a3a;border-radius:10px;padding:20px;text-align:center;margin-top:20px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4CAF50;letter-spacing:3px;margin-bottom:8px;">🏆 TXAPELDUNA</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:3px;color:#C9A84C;">${fin.sa>fin.sb?sf1Win:sf2Win}</div>
+    </div>`:''}`;
+}
+
+function bCard(pA,pB,res,label) {
+  return `<div class="bracket-match ${res?'jugado':''}">
+    <div class="partido-meta"><span>${label}</span><span>${res?'✓ JOKATU':'PENDIENTE'}</span></div>
+    <div class="partido-equipos">
+      <div class="equipo-name">${pA}</div>
+      <div class="resultado-display">${res?`${res.sa}–${res.sb}`:'·–·'}</div>
+      <div class="equipo-name right">${pB}</div>
+    </div>
+  </div>`;
+}
+
+// ===================== ADMIN =====================
+window.showAdminLogin = () => {
+  document.getElementById('admin-tab').style.display = 'flex';
+  switchView('admin');
+};
+
+window.checkAdmin = () => {
+  if (document.getElementById('admin-pin').value===ADMIN_PIN) {
+    adminUnlocked=true;
+    document.getElementById('admin-lock-screen').style.display='none';
+    document.getElementById('admin-content').style.display='block';
+    populateAdminMatchSel();
+    renderAdminLog();
+  } else {
+    document.getElementById('pin-error').textContent='Pasahitz okerra';
+  }
+};
+
+function populateAdminMatchSel() {
+  const sel = document.getElementById('admin-match-sel');
+  sel.innerHTML = '<option value="">— Aukeratu partida —</option>';
+  for (let j=1;j<=7;j++) {
+    const og = document.createElement('optgroup');
+    og.label = `${j}. Jardunaldia`;
+    SCHEDULE.filter(m=>m.j===j).forEach(m => {
+      const opt=document.createElement('option');
+      opt.value=MATCH_KEY(m);
+      opt.textContent=`${m.a} vs ${m.b} (${m.date})`;
+      og.appendChild(opt);
+    });
+    sel.appendChild(og);
+  }
+  const og2=document.createElement('optgroup');
+  og2.label='Azken Fasea';
+  [{id:'sf1',label:'1. Finalerdia'},{id:'sf2',label:'2. Finalerdia'},{id:'final',label:'Finala'}].forEach(k => {
+    const opt=document.createElement('option');
+    opt.value='ko_'+k.id; opt.textContent=k.label; og2.appendChild(opt);
+  });
+  sel.appendChild(og2);
+}
+
+window.fillAdminScore = () => {
+  const sel=document.getElementById('admin-match-sel').value;
+  if (!sel) return;
+  const res = sel.startsWith('ko_') ? knockoutResults[sel.replace('ko_','')] : results[sel];
+  if (!sel.startsWith('ko_')) {
+    const m=SCHEDULE.find(s=>MATCH_KEY(s)===sel);
+    if (m) {
+      document.getElementById('admin-label-a').textContent=m.a.split(' / ')[0].toUpperCase();
+      document.getElementById('admin-label-b').textContent=m.b.split(' / ')[0].toUpperCase();
+    }
+  }
+  document.getElementById('admin-score-a').value=res?res.sa:'';
+  document.getElementById('admin-score-b').value=res?res.sb:'';
+};
+
+window.adminSaveResult = async () => {
+  const sel=document.getElementById('admin-match-sel').value;
+  const sa=parseInt(document.getElementById('admin-score-a').value);
+  const sb=parseInt(document.getElementById('admin-score-b').value);
+  if (!sel||isNaN(sa)||isNaN(sb)) { alert('Bete eremuak'); return; }
+  try {
+    if (sel.startsWith('ko_')) {
+      await fbSet('knockout', sel.replace('ko_',''), {sa,sb});
+    } else {
+      const m=SCHEDULE.find(s=>MATCH_KEY(s)===sel);
+      await fbSet('results', sel, {sa,sb,matchA:m?.a,matchB:m?.b,jornada:m?.j,date:m?.date});
+    }
+    showToast('Gordeta ✓');
+  } catch(e) { showToast('Errorea: '+e.message, true); }
+};
+
+window.deleteResult = async (key, type) => {
+  if (!confirm('Emaitza ezabatu?')) return;
+  try {
+    await fbDel(type==='ko'?'knockout':'results', key);
+    showToast('Ezabatu ✓');
+  } catch(e) { showToast('Errorea: '+e.message, true); }
+};
+
+function renderAdminLog() {
+  const cont=document.getElementById('results-log');
+  const items=[];
+  SCHEDULE.forEach(m => {
+    const key=MATCH_KEY(m);
+    if (results[key]) {
+      const r=results[key];
+      items.push({label:`J${m.j} · ${m.a} vs ${m.b}`,score:`${r.sa}–${r.sb}`,key,type:'liga'});
+    }
+  });
+  [{id:'sf1',l:'1. Finalerdia'},{id:'sf2',l:'2. Finalerdia'},{id:'final',l:'Finala'}].forEach(k => {
+    if (knockoutResults[k.id]) {
+      const r=knockoutResults[k.id];
+      items.push({label:k.l,score:`${r.sa}–${r.sb}`,key:k.id,type:'ko'});
+    }
+  });
+  if (!items.length) { cont.innerHTML='<div class="empty-state">Ez dago emaitzarik oraindik</div>'; return; }
+  cont.innerHTML = items.reverse().map(it => `
+    <div class="log-item">
+      <div class="log-match">${it.label}</div>
+      <div class="log-score">${it.score}</div>
+      <button class="btn-delete" onclick="deleteResult('${it.key}','${it.type}')">✕</button>
+    </div>`).join('');
+}
+
+// ===================== NAV =====================
+window.switchView = view => {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  const map={clasificacion:0,partidos:1,bracket:2,admin:3};
+  document.querySelectorAll('.nav-tab')[map[view]]?.classList.add('active');
+  if (view==='partidos') renderPartidos();
+  if (view==='bracket') renderBracket();
+  if (view==='clasificacion') renderStandings();
+};
+
+// ===================== TOAST =====================
+window.showToast = (msg, isError=false) => {
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast'+(isError?' error':'')+' show';
+  setTimeout(()=>t.classList.remove('show'),2800);
+};
+
+// ===================== INIT =====================
+function renderAll() {
+  renderStandings(); renderPartidos(); renderBracket();
+  if (adminUnlocked) renderAdminLog();
+}
+
+initPairSelector();
+initJornadaBtns();
+initFirebase();
+
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target===document.getElementById('modal-overlay')) closeModal();
+});
+</script>
+</body>
+</html>
