@@ -57,14 +57,14 @@
   .jornada-selector label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--muted); display: block; margin-bottom: 8px; }
   .jornada-btns { display: flex; gap: 8px; flex-wrap: wrap; }
   .jornada-btn { font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 8px 14px; background: #1a1a1a; border: 1px solid #333; color: var(--muted); border-radius: 4px; cursor: pointer; transition: all 0.15s; letter-spacing: 1px; }
-  .jornada-btn.active { background: var(--red); border-color: var(--red); color: white; }
+  .jornada-btn.active { background: #447AB8; border-color: #447AB8; color: white; }
   .jornada-btn:hover:not(.active) { border-color: var(--muted); color: var(--cream); }
 
   .partidos-list { display: flex; flex-direction: column; gap: 10px; }
   .partido-card { background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 14px 16px; }
   .partido-card.jugado { border-left: 3px solid var(--green); }
   .partido-card.pending { border-left: 3px solid #333; }
-  .partido-meta { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .partido-meta { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--cream); letter-spacing: 1px; margin-bottom: 10px; display: flex; justify-content: space-between; }
   .partido-equipos { display: flex; align-items: center; gap: 8px; }
   .equipo-name { font-size: 13px; font-weight: 500; flex: 1; color: var(--cream); }
   .equipo-name.right { text-align: right; }
@@ -613,7 +613,7 @@ function renderPartidos() {
   cont.innerHTML = matches.map(m => {
     const key=MATCH_KEY(m), res=results[key], jugado=!!res;
     return `<div class="partido-card ${jugado?'jugado':'pending'}">
-      <div class="partido-meta"><span>${m.group} TALDEA · ${m.date} · <strong style="color:var(--cream)">${m.time}</strong></span><span>${jugado?'✓ JOKATU':'PENDIENTE'}</span></div>
+      <div class="partido-meta"><span>${m.group} TALDEA · ${m.date} · ${m.time}</span><span>${jugado?'✓ JOKATU':'PENDIENTE'}</span></div>
       <div class="partido-ref">EPAILEA: ${m.ref}</div>
       <div class="partido-equipos">
         <div class="equipo-name">${m.a}</div>
@@ -874,5 +874,9 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target===document.getElementById('modal-overlay')) closeModal();
 });
 </script>
+  <div style="text-align:center; padding: 24px 16px 32px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#444; letter-spacing:1px; border-top: 1px solid #1a1a1a; margin-top: 20px;">
+    Santa Ana Pala Txapelketa 2026 · Lasarte-Oria<br>
+    <span style="color:#333;">Garatua: jimipage19</span>
+  </div>
 </body>
 </html>
