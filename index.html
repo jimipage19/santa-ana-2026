@@ -295,9 +295,9 @@
       <div class="section-title">Antolakuntza</div>
       <div class="section-sub">EMAITZAK KUDEATU</div>
       <div class="admin-panel">
-        <h3>Emaitza sartu / aldatu</h3>
+        <h3>Emaitza aldatu</h3>
         <div class="form-row">
-          <label>PARTIDA</label>
+          <label>PARTIDA (jokatu direnak soilik)</label>
           <select id="admin-match-sel" onchange="fillAdminScore()">
             <option value="">— Aukeratu partida —</option>
           </select>
@@ -306,6 +306,7 @@
           <div class="form-row"><label id="admin-label-a">LOCAL</label><input type="number" id="admin-score-a" min="0" max="25" placeholder="0"></div>
           <div class="form-row"><label id="admin-label-b">BISITARI</label><input type="number" id="admin-score-b" min="0" max="25" placeholder="0"></div>
         </div>
+        <div id="admin-error" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#ff4466;min-height:18px;margin-bottom:8px;font-weight:600;"></div>
         <button class="btn-save" onclick="adminSaveResult()">GORDE</button>
       </div>
       <div class="admin-panel">
@@ -775,23 +776,33 @@ function populateAdminMatchSel() {
   const sel = document.getElementById('admin-match-sel');
   sel.innerHTML = '<option value="">— Aukeratu partida —</option>';
   for (let j=1;j<=7;j++) {
+    const played = SCHEDULE.filter(m=>m.j===j && results[MATCH_KEY(m)]);
+    if (!played.length) continue;
     const og = document.createElement('optgroup');
     og.label = `${j}. Jardunaldia`;
-    SCHEDULE.filter(m=>m.j===j).forEach(m => {
+    played.forEach(m => {
+      const r=results[MATCH_KEY(m)];
       const opt=document.createElement('option');
       opt.value=MATCH_KEY(m);
-      opt.textContent=`${m.a} vs ${m.b} (${m.date})`;
+      opt.textContent=`${m.a} vs ${m.b} — ${r.sa}–${r.sb}`;
       og.appendChild(opt);
     });
     sel.appendChild(og);
   }
-  const og2=document.createElement('optgroup');
-  og2.label='Azken Fasea';
-  [{id:'sf1',label:'1. Finalerdia'},{id:'sf2',label:'2. Finalerdia'},{id:'final',label:'Finala'}].forEach(k => {
-    const opt=document.createElement('option');
-    opt.value='ko_'+k.id; opt.textContent=k.label; og2.appendChild(opt);
-  });
-  sel.appendChild(og2);
+  const koPlayed = [{id:'sf1',label:'1. Finalerdia'},{id:'sf2',label:'2. Finalerdia'},{id:'final',label:'Finala'}]
+    .filter(k=>knockoutResults[k.id]);
+  if (koPlayed.length) {
+    const og2=document.createElement('optgroup');
+    og2.label='Azken Fasea';
+    koPlayed.forEach(k => {
+      const r=knockoutResults[k.id];
+      const opt=document.createElement('option');
+      opt.value='ko_'+k.id;
+      opt.textContent=`${k.label} — ${r.sa}–${r.sb}`;
+      og2.appendChild(opt);
+    });
+    sel.appendChild(og2);
+  }
 }
 
 window.fillAdminScore = () => {
@@ -813,7 +824,14 @@ window.adminSaveResult = async () => {
   const sel=document.getElementById('admin-match-sel').value;
   const sa=parseInt(document.getElementById('admin-score-a').value);
   const sb=parseInt(document.getElementById('admin-score-b').value);
-  if (!sel||isNaN(sa)||isNaN(sb)) { alert('Bete eremuak'); return; }
+  const errEl=document.getElementById('admin-error');
+  errEl.textContent='';
+  if (!sel) { errEl.textContent='⚠ Aukeratu partida bat'; return; }
+  if (isNaN(sa)||isNaN(sb)) { errEl.textContent='⚠ Sartu bi emaitzak'; return; }
+  if (sa<0||sb<0) { errEl.textContent='⚠ Ezin negatibo'; return; }
+  if (sa>25||sb>25) { errEl.textContent='⚠ Gehienez 25 tanto'; return; }
+  if (sa===sb) { errEl.textContent='⚠ Ezin berdinketa — batek 25 behar du'; return; }
+  if (sa!==25&&sb!==25) { errEl.textContent='⚠ Batek 25 tanto egin behar ditu'; return; }
   try {
     if (sel.startsWith('ko_')) {
       await fbSet('knockout', sel.replace('ko_',''), {sa,sb});
@@ -822,6 +840,7 @@ window.adminSaveResult = async () => {
       await fbSet('results', sel, {sa,sb,matchA:m?.a,matchB:m?.b,jornada:m?.j,date:m?.date});
     }
     showToast('Gordeta ✓');
+    errEl.textContent='';
   } catch(e) { showToast('Errorea: '+e.message, true); }
 };
 
@@ -850,6 +869,7 @@ function renderAdminLog() {
     }
   });
   if (!items.length) { cont.innerHTML='<div class="empty-state">Ez dago emaitzarik oraindik</div>'; return; }
+  populateAdminMatchSel();
   cont.innerHTML = items.reverse().map(it => `
     <div class="log-item">
       <div class="log-match">${it.label}</div>
