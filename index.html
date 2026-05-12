@@ -368,7 +368,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, getDoc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD10AS8ydXP_fpz8aYhCSFR6cbV0Ji0_gs",
@@ -898,6 +898,24 @@ window.showToast = (msg, isError=false) => {
   setTimeout(()=>t.classList.remove('show'),2800);
 };
 
+// ===================== VISIT COUNTER =====================
+async function initVisitCounter() {
+  try {
+    const ref = doc(db, 'stats', 'visitas');
+    // Increment counter
+    const snap = await getDoc(ref);
+    const current = snap.exists() ? (snap.data().count || 0) : 0;
+    await setDoc(ref, { count: current + 1 }, { merge: true });
+    // Listen for updates
+    onSnapshot(ref, d => {
+      if (d.exists()) {
+        const el = document.getElementById('visit-counter');
+        if (el) el.textContent = `${d.data().count} bisita`;
+      }
+    });
+  } catch(e) { console.log('Visit counter error:', e); }
+}
+
 // ===================== INIT =====================
 function renderAll() {
   renderStandings(); renderPartidos(); renderBracket();
@@ -907,6 +925,7 @@ function renderAll() {
 initPairSelector();
 initJornadaBtns();
 initFirebase();
+initVisitCounter();
 
 document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target===document.getElementById('modal-overlay')) closeModal();
@@ -914,7 +933,7 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
 </script>
   <div style="text-align:center; padding: 24px 16px 32px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#444; letter-spacing:1px; border-top: 1px solid #1a1a1a; margin-top: 20px;">
     Santa Ana Pala Txapelketa 2026 · Lasarte-Oria<br>
-    <span style="color:#333;">Garatua: jimipage19</span>
+    <span style="color:#333;">Garatua: jimipage19 · </span><span id="visit-counter" style="color:#333;">· · ·</span>
   </div>
 </body>
 </html>
