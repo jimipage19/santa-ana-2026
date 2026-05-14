@@ -529,28 +529,54 @@ function computeStandings(group) {
     return h;
   }
 
+  function allPlayedEachOther(names, group) {
+    // Check if every pair among tied names has played each other
+    for (let i = 0; i < names.length; i++) {
+      for (let j = i+1; j < names.length; j++) {
+        const played = SCHEDULE.some(m =>
+          m.group===group &&
+          ((m.a===names[i]&&m.b===names[j])||(m.a===names[j]&&m.b===names[i])) &&
+          results[MATCH_KEY(m)]
+        );
+        if (!played) return false;
+      }
+    }
+    return true;
+  }
+
   function sortTied(tied, group) {
     if (tied.length <= 1) return tied;
     const names = tied.map(r => r.name);
-    const h = h2hStatsAmong(names, group);
+    const allPlayed = allPlayedEachOther(names, group);
 
-    // Check if h2h points all equal (circular tie)
-    const hPts = names.map(n => h[n].pts);
-    const allHPtsEqual = hPts.every(p => p === hPts[0]);
+    if (allPlayed) {
+      // All have played each other: use h2h criteria
+      const h = h2hStatsAmong(names, group);
+      const hPts = names.map(n => h[n].pts);
+      const allHPtsEqual = hPts.every(p => p === hPts[0]);
 
-    return tied.sort((a, b) => {
-      // 1. overall points (already equal in this group)
-      // 2. h2h points among tied (only meaningful if not all equal)
-      if (!allHPtsEqual) {
-        if (h[b.name].pts !== h[a.name].pts) return h[b.name].pts - h[a.name].pts;
-      }
-      // 3. h2h tantos difference among tied
-      const da = h[a.name].tf - h[a.name].tc;
-      const db2 = h[b.name].tf - h[b.name].tc;
-      if (db2 !== da) return db2 - da;
-      // 4. overall tantos difference
-      return (b.tf-b.tc) - (a.tf-a.tc);
-    });
+      return tied.sort((a, b) => {
+        // 2. h2h points
+        if (!allHPtsEqual) {
+          if (h[b.name].pts !== h[a.name].pts) return h[b.name].pts - h[a.name].pts;
+        }
+        // 3. h2h tantos difference
+        const da = h[a.name].tf - h[a.name].tc;
+        const db2 = h[b.name].tf - h[b.name].tc;
+        if (db2 !== da) return db2 - da;
+        // 4. overall tantos difference
+        return (b.tf-b.tc) - (a.tf-a.tc);
+      });
+    } else {
+      // Not all have played each other yet: use overall difference then tf
+      return tied.sort((a, b) => {
+        // overall tantos difference
+        const da = a.tf-a.tc, db = b.tf-b.tc;
+        if (db !== da) return db - da;
+        // tantos a favor
+        return b.tf - a.tf;
+      });
+    }
   }
 
   // Sort each points group internally, then flatten
@@ -933,7 +959,7 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
 </script>
   <div style="text-align:center; padding: 24px 16px 32px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#444; letter-spacing:1px; border-top: 1px solid #1a1a1a; margin-top: 20px;">
     Santa Ana Pala Txapelketa 2026 · Lasarte-Oria<br>
-    <span style="color:#333;">Garatua: jimipage19 · </span><span id="visit-counter" style="color:#333;">· · ·</span>
+    <span style="color:#666;">Garatua: jimipage19 · </span><span id="visit-counter" style="color:#666;">· · ·</span>
   </div>
 </body>
 </html>
