@@ -188,7 +188,7 @@
   <div class="nav-inner">
     <div class="nav-tab active" onclick="switchView('clasificacion')">SAILKAP.</div>
     <div class="nav-tab" onclick="switchView('partidos')">PARTIDAK</div>
-    <div class="nav-tab" onclick="switchView('bracket')">FINALA</div>
+    <div class="nav-tab" onclick="switchView('bracket')">FINALAK</div>
     <div class="nav-tab" onclick="switchView('araudia')">ARAUDIA</div>
     <div class="nav-tab" onclick="switchView('datak')">HUEKOAK</div>
     <div class="nav-tab" id="admin-tab" style="display:none" onclick="switchView('admin')">ANTOL.</div>
@@ -333,6 +333,26 @@
         <h3>Data aldaketa eskaerak</h3>
         <div class="results-log" id="cambios-log"></div>
       </div>
+      <div class="admin-panel" id="admin-edit-cambio-panel" style="display:none">
+        <h3>Data aldaketa editatu</h3>
+        <div class="form-row"><label>PARTIDA</label><div id="admin-edit-cambio-label" style="font-size:13px;color:var(--cream-dark);padding:8px 0;"></div></div>
+        <div class="form-row">
+          <label>DATA</label>
+          <input type="date" id="admin-edit-date" style="width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:var(--cream);font-size:14px;outline:none;color-scheme:dark;">
+        </div>
+        <div class="form-row">
+          <label>ORDUA</label>
+          <input type="time" id="admin-edit-time" style="width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:var(--cream);font-size:14px;outline:none;color-scheme:dark;">
+        </div>
+        <div class="form-row">
+          <label>EPAILEA</label>
+          <input type="text" id="admin-edit-ref" style="width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:var(--cream);font-size:14px;outline:none;">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:6px;">
+          <button class="btn-save" style="flex:2;" onclick="adminSaveCambioEdit()">GORDE</button>
+          <button class="btn-cancel" style="flex:1;padding:12px;background:transparent;border:1px solid #444;color:var(--muted);border-radius:6px;cursor:pointer;" onclick="document.getElementById('admin-edit-cambio-panel').style.display='none'">UTZI</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -405,6 +425,10 @@
       <div class="form-row">
         <label>ORDUA BERRIA</label>
         <input type="time" id="cambio-time" style="width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:var(--cream);font-family:'IBM Plex Sans',sans-serif;font-size:14px;outline:none;color-scheme:dark;">
+      </div>
+      <div class="form-row">
+        <label>EPAILE BERRIA</label>
+        <input type="text" id="cambio-ref" placeholder="Idatzi epaileak..." style="width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:var(--cream);font-family:'IBM Plex Sans',sans-serif;font-size:14px;outline:none;">
       </div>
       <div id="cambio-error" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#ff4466;min-height:18px;margin-bottom:8px;font-weight:600;"></div>
       <div class="modal-btns">
@@ -727,7 +751,7 @@ function renderPartidos() {
     const cambioEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===mKey && !c.isReserva);
     const cambio = cambioEntry ? cambioEntry[1] : null;
     const cambioId = cambioEntry ? cambioEntry[0] : null;
-    const efectivo = getEffectiveMatchInfo(mKey, m.date, m.time);
+    const efectivo = getEffectiveMatchInfo(mKey, m.date, m.time, m.ref);
     const cambioHtml = cambio
       ? `<div class='cambio-badge ${cambio.status}' style='display:block;margin-top:6px;'>${
           cambio.status==='pendiente'?'⏳ DATA ALDAKETA ESKATUA':
@@ -740,8 +764,8 @@ function renderPartidos() {
             </div>` : ''}`
       : '';
     return `<div class="partido-card ${jugado?'jugado':'pending'}">
-      <div class="partido-meta"><span>${m.group} TALDEA · ${efectivo.date}${efectivo.changed?' 🔄':''} · ${efectivo.time}</span><span>${jugado?'✓ JOKATU':'PENDIENTE'}</span></div>
-      <div class="partido-ref">EPAILEA: ${m.ref}</div>
+      <div class="partido-meta"><span>${m.group} TALDEA · ${efectivo.date}${efectivo.changed?' 🔄':''} · ${efectivo.time}</span><span>${jugado?'✓ JOKATUA':'PENDIENTE'}</span></div>
+      <div class="partido-ref">EPAILEA: ${efectivo.ref || m.ref}${efectivo.changed && efectivo.ref!==m.ref?' 🔄':''}</div>
       <div class="partido-equipos">
         <div class="equipo-name">${m.a}</div>
         <div class="resultado-display">${jugado?`${res.sa}–${res.sb}`:'·–·'}</div>
@@ -855,7 +879,7 @@ function renderBracket() {
 
 function bCard(pA,pB,res,label) {
   return `<div class="bracket-match ${res?'jugado':''}">
-    <div class="partido-meta"><span>${label}</span><span>${res?'✓ JOKATU':'PENDIENTE'}</span></div>
+    <div class="partido-meta"><span>${label}</span><span>${res?'✓ JOKATUA':'PENDIENTE'}</span></div>
     <div class="partido-equipos">
       <div class="equipo-name">${pA}</div>
       <div class="resultado-display">${res?`${res.sa}–${res.sb}`:'·–·'}</div>
@@ -1103,6 +1127,7 @@ window.openCambioModal = function(match) {
   dateInput.max = limit;
   dateInput.value = '';
   document.getElementById('cambio-time').value = '';
+  document.getElementById('cambio-ref').value = '';
   document.getElementById('cambio-modal-overlay').classList.add('open');
 };
 
@@ -1117,8 +1142,10 @@ window.submitCambio = async function() {
   const errEl = document.getElementById('cambio-error');
   errEl.textContent = '';
 
+  const refVal = document.getElementById('cambio-ref').value.trim();
   if (!dateVal) { errEl.textContent = '⚠ Aukeratu data berria'; return; }
   if (!timeVal) { errEl.textContent = '⚠ Aukeratu ordua'; return; }
+  if (!refVal) { errEl.textContent = '⚠ Idatzi epailearen izena'; return; }
 
   // Check date limit
   const limit = getDateLimit(currentCambioMatch.j);
@@ -1145,6 +1172,7 @@ window.submitCambio = async function() {
       originalTime: currentCambioMatch.time,
       newDate: dateVal,
       newTime: timeVal,
+      newRef: refVal,
       status: 'pendiente',
       createdAt: Date.now()
     });
@@ -1180,12 +1208,23 @@ window.deleteCambio = async function(cambioId) {
 };
 
 // Get effective date/time for a match (considering approved cambios)
-function getEffectiveMatchInfo(matchKey, originalDate, originalTime) {
+function getEffectiveMatchInfo(matchKey, originalDate, originalTime, originalRef) {
   const approved = Object.values(cambios).find(c =>
-    c.matchKey===matchKey && c.status==='aprobado'
+    c.matchKey===matchKey && c.status==='aprobado' && !c.isReserva
   );
-  if (approved) return { date: formatDateES(approved.newDate), time: approved.newTime, changed: true };
-  return { date: originalDate, time: originalTime, changed: false };
+  if (approved) return { date: formatDateES(approved.newDate), time: approved.newTime, ref: approved.newRef || originalRef, changed: true };
+  // Check if a reserva was approved for this match
+  const reservaApproved = Object.values(cambios).find(c =>
+    c.matchKey===matchKey && c.status==='aprobado' && c.isReserva
+  );
+  if (reservaApproved) {
+    // Find the original match at the reserved slot to get its referee
+    const slotMatch = SCHEDULE.find(m =>
+      m.date===reservaApproved.slotDate && m.time===reservaApproved.slotTime
+    );
+    return { date: reservaApproved.slotDate, time: reservaApproved.slotTime, ref: slotMatch ? slotMatch.ref : originalRef, changed: true };
+  }
+  return { date: originalDate, time: originalTime, ref: originalRef, changed: false };
 }
 
 // Get freed slots (original dates of approved cambios)
@@ -1264,7 +1303,7 @@ function renderCambiosLog() {
         <button class="btn-aprobar" onclick="aprobarCambio('${id}')">ONARTU</button>
         <button class="btn-rechazar" onclick="rechazarCambio('${id}')">UKATU</button>
         <button class="btn-delete" onclick="deleteCambio('${id}')">✕</button>
-      </div>` : `<button class="btn-delete" style="margin-top:4px;" onclick="deleteCambio('${id}')">✕ EZABATU</button>`}
+      </div>` : `<div style='display:flex;gap:6px;margin-top:4px;'>${!isReserva && c.status==='aprobado'?`<button class='btn-aprobar' onclick='adminEditCambio("${id}")'>✏ EDITATU</button>`:''}<button class='btn-delete' onclick='deleteCambio("${id}")'>✕ EZABATU</button></div>`}
     </div>`;
   }).join('');
 }
@@ -1332,6 +1371,36 @@ window.submitReserva = async function() {
     closeReservaModal();
     showToast('Erreserba eskaera bidalia ✓');
   } catch(e) { errEl.textContent = '⚠ Errorea: ' + e.message; }
+};
+
+// ===================== ADMIN EDIT CAMBIO =====================
+let adminEditCambioId = null;
+
+window.adminEditCambio = function(cambioId) {
+  const c = cambios[cambioId];
+  if (!c) return;
+  adminEditCambioId = cambioId;
+  document.getElementById('admin-edit-cambio-label').textContent = `${c.matchA} vs ${c.matchB}`;
+  document.getElementById('admin-edit-date').value = c.newDate || '';
+  document.getElementById('admin-edit-time').value = c.newTime || '';
+  document.getElementById('admin-edit-ref').value = c.newRef || '';
+  document.getElementById('admin-edit-cambio-panel').style.display = 'block';
+  document.getElementById('admin-edit-cambio-panel').scrollIntoView({behavior:'smooth'});
+};
+
+window.adminSaveCambioEdit = async function() {
+  if (!adminEditCambioId) return;
+  const c = cambios[adminEditCambioId];
+  const newDate = document.getElementById('admin-edit-date').value;
+  const newTime = document.getElementById('admin-edit-time').value;
+  const newRef = document.getElementById('admin-edit-ref').value.trim();
+  if (!newDate || !newTime || !newRef) { showToast('Bete eremu guztiak', true); return; }
+  try {
+    await fbSet('cambios', adminEditCambioId, {...c, newDate, newTime, newRef, status:'aprobado'});
+    document.getElementById('admin-edit-cambio-panel').style.display = 'none';
+    adminEditCambioId = null;
+    showToast('Gordeta ✓');
+  } catch(e) { showToast('Errorea: '+e.message, true); }
 };
 
 // ===================== VISIT COUNTER =====================
