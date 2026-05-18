@@ -197,6 +197,24 @@
   .data-libre-card { background:#141414; border:1px solid #2a2a2a; border-left:3px solid #447AB8; border-radius:8px; padding:14px 16px; margin-bottom:10px; }
   .data-libre-date { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; color:#447AB8; }
   .data-libre-info { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); margin:4px 0 10px; }
+  /* BRACKET */
+  .bracket-round-label { font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 3px; margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #2a2a2a; }
+  .bracket-matches-col { display: flex; flex-direction: column; gap: 12px; }
+  .bm { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid #2a3a5c; border-radius: 10px; padding: 12px 14px; position: relative; overflow: hidden; }
+  .bm.jugado { border-color: #1a5c2a; background: linear-gradient(135deg, #0d1a10 0%, #1a2e1a 100%); }
+  .bm.final-match { border-color: #7a6020; background: linear-gradient(135deg, #1a1500 0%, #2e2500 100%); }
+  .bm-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 2px; color: #447AB8; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .bm-label.gold { color: var(--gold); }
+  .bm-teams { display: flex; flex-direction: column; gap: 0; }
+  .bm-team { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 6px; }
+  .bm-team.winner { background: rgba(26,90,42,0.4); }
+  .bm-team.loser { opacity: 0.5; }
+  .bm-name { font-size: 13px; font-weight: 500; color: var(--cream); flex: 1; }
+  .bm-name.tbd { color: var(--muted); font-style: italic; font-size: 12px; }
+  .bm-score { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--gold); min-width: 28px; text-align: right; }
+  .bm-vs { text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #444; letter-spacing: 2px; padding: 2px 0; }
+  .bm-winner-tag { margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #4CAF50; letter-spacing: 1px; display: flex; align-items: center; gap: 4px; }
+  .champion-box { background: linear-gradient(135deg, #0d1a10, #1a2e1a); border: 1px solid #1a7a3a; border-radius: 12px; padding: 24px; text-align: center; margin-top: 20px; }
   .loading-overlay { position: fixed; inset: 0; background: var(--black); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 500; gap: 16px; transition: opacity 0.3s; }
   .loading-overlay.hidden { opacity: 0; pointer-events: none; }
   .spinner { width: 32px; height: 32px; border: 3px solid #333; border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; }
@@ -274,7 +292,7 @@
 
   <div class="view" id="view-bracket">
     <div class="section-title">Azken Fasea</div>
-    <div class="section-sub">FINALERDIAK ETA FINALA</div>
+    <div class="section-sub">FINAL-LAURDENAK · FINALERDIAK · FINALA</div>
     <div id="bracket-content"></div>
   </div>
 
@@ -299,10 +317,17 @@
 
     <div class="araudia-section">
       <div class="araudia-title">Azken fasea</div>
-      <p>Ligaxka amaitzean, talde bakoitzeko lehen bi sailkatuak azken fasera igaroko dira.</p>
-      <div class="araudia-rule"><span class="rule-num">SF</span>A taldeko 1. sailkatua — B taldeko 2. sailkatuaren aurka</div>
-      <div class="araudia-rule"><span class="rule-num">SF</span>B taldeko 1. sailkatua — A taldeko 2. sailkatuaren aurka</div>
-      <p style="margin-top:10px;">Finalerdietako irabazleek finala jokatuko dute.</p>
+      <p>Ligaxka amaitzean, talde bakoitzeko lehen lau sailkatuak azken fasera igaroko dira.</p>
+      <div class="araudia-subtitle">FINAL-LAURDENAK (uztailak 14 eta 16)</div>
+      <div class="araudia-rule"><span class="rule-num">FL1</span>A taldeko 1. sailkatua — B taldeko 4. sailkatuaren aurka (uzt. 14)</div>
+      <div class="araudia-rule"><span class="rule-num">FL2</span>A taldeko 2. sailkatua — B taldeko 3. sailkatuaren aurka (uzt. 14)</div>
+      <div class="araudia-rule"><span class="rule-num">FL3</span>B taldeko 1. sailkatua — A taldeko 4. sailkatuaren aurka (uzt. 16)</div>
+      <div class="araudia-rule"><span class="rule-num">FL4</span>B taldeko 2. sailkatua — A taldeko 3. sailkatuaren aurka (uzt. 16)</div>
+      <div class="araudia-subtitle">FINALERDIAK (uztailak 21)</div>
+      <div class="araudia-rule"><span class="rule-num">SF1</span>FL1 irabazlea — FL4 irabazlearen aurka</div>
+      <div class="araudia-rule"><span class="rule-num">SF2</span>FL3 irabazlea — FL2 irabazlearen aurka</div>
+      <div class="araudia-subtitle">FINALA (uztailak 26)</div>
+      <div class="araudia-rule"><span class="rule-num">FIN</span>SF1 irabazlea — SF2 irabazlearen aurka</div>
     </div>
 
     <div class="araudia-section">
@@ -765,13 +790,18 @@ function getH2H(pA,pB,group) {
 function renderStandings() {
   ['A','B'].forEach(g => {
     const rows = computeStandings(g);
-    document.getElementById(`standings-${g.toLowerCase()}`).innerHTML = rows.map((r,i) => `
-      <tr class="${i<2?'top2':''}">
-        <td><span class="pos-badge">${i+1}</span><span class="pair-name">${r.name}</span></td>
+    document.getElementById(`standings-${g.toLowerCase()}`).innerHTML = rows.map((r,i) => {
+      const posLabel = g+(i+1);
+      const diff = r.tf-r.tc;
+      const badgeBg = i<2?'#1A7A3A':i<4?'#447AB8':'#2a2a2a';
+      const nameColor = i<2?'#4CAF50':i<4?'#7ab8e8':'var(--cream-dark)';
+      return `<tr>
+        <td><span class="pos-badge" style="background:${badgeBg};color:white;font-size:10px;">${posLabel}</span><span class="pair-name" style="color:${nameColor}">${r.name}</span></td>
         <td>${r.p}</td><td>${r.w}</td><td>${r.l}</td><td>${r.tf}</td><td>${r.tc}</td>
-        <td class="${(r.tf-r.tc)>0?'dif-pos':(r.tf-r.tc)<0?'dif-neg':'dif-cell'}">${(r.tf-r.tc)>0?'+'+(r.tf-r.tc):(r.tf-r.tc)}</td>
+        <td class="${diff>0?'dif-pos':diff<0?'dif-neg':'dif-cell'}">${diff>0?'+'+diff:diff}</td>
         <td class="pts-cell">${r.pts}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   });
 }
 
@@ -1051,47 +1081,109 @@ window.saveResult = async () => {
 // ===================== BRACKET =====================
 function getTopPairs() {
   return {
-    topA: computeStandings('A').slice(0,2).map(r=>r.name),
-    topB: computeStandings('B').slice(0,2).map(r=>r.name)
+    topA: computeStandings('A').slice(0,4).map(r=>r.name),
+    topB: computeStandings('B').slice(0,4).map(r=>r.name)
   };
 }
 
 function renderBracket() {
   const {topA,topB} = getTopPairs();
-  const a1=topA[0]||'A Taldeko 1.', a2=topA[1]||'A Taldeko 2.';
-  const b1=topB[0]||'B Taldeko 1.', b2=topB[1]||'B Taldeko 2.';
-  const sf1=knockoutResults['sf1'], sf2=knockoutResults['sf2'], fin=knockoutResults['final'];
-  const sf1Win = sf1?(sf1.sa>sf1.sb?a1:b2):'?';
-  const sf2Win = sf2?(sf2.sa>sf2.sb?b1:a2):'?';
+  const a1=topA[0]||'?', a2=topA[1]||'?', a3=topA[2]||'?', a4=topA[3]||'?';
+  const b1=topB[0]||'?', b2=topB[1]||'?', b3=topB[2]||'?', b4=topB[3]||'?';
+
+  const qf1=knockoutResults['qf1'], qf2=knockoutResults['qf2'];
+  const qf3=knockoutResults['qf3'], qf4=knockoutResults['qf4'];
+  const sf1=knockoutResults['sf1'], sf2=knockoutResults['sf2'];
+  const fin=knockoutResults['final'];
+
+  // QF winners
+  const qf1w = qf1?(qf1.sa>qf1.sb?a1:b4):'?';
+  const qf2w = qf2?(qf2.sa>qf2.sb?a2:b3):'?';
+  const qf3w = qf3?(qf3.sa>qf3.sb?b1:a4):'?';
+  const qf4w = qf4?(qf4.sa>qf4.sb?b2:a3):'?';
+
+  // SF: SF1 = FL1irab vs FL4irab, SF2 = FL3irab vs FL2irab
+  const sf1a = qf1w!=='?'?qf1w:'FL1 irabazlea';
+  const sf1b = qf4w!=='?'?qf4w:'FL4 irabazlea';
+  const sf2a = qf3w!=='?'?qf3w:'FL3 irabazlea';
+  const sf2b = qf2w!=='?'?qf2w:'FL2 irabazlea';
+
+  const sf1w = sf1?(sf1.sa>sf1.sb?sf1a:sf1b):'?';
+  const sf2w = sf2?(sf2.sa>sf2.sb?sf2a:sf2b):'?';
+
+  const fteamA = sf1w!=='?'?sf1w:'SF1 irabazlea';
+  const fteamB = sf2w!=='?'?sf2w:'SF2 irabazlea';
+
+  const champion = fin?(fin.sa>fin.sb?sf1w:sf2w):null;
   const done = SCHEDULE.filter(m=>results[MATCH_KEY(m)]).length;
 
   document.getElementById('bracket-content').innerHTML = `
-    ${done<SCHEDULE.length?`<div style="background:#1a1200;border:1px solid #5a4000;border-radius:8px;padding:14px;margin-bottom:20px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#c9a84c;letter-spacing:1px;">⏳ Ligaxka ez da bukatu — ${done}/${SCHEDULE.length} partida jokatu dira</div>`:''}
-    <div class="bracket-section">
-      <h3>FINALERDIAK</h3>
-      ${bCard(a1,b2,sf1,'1. Finalerdia · A1 vs B2')}
-      ${bCard(b1,a2,sf2,'2. Finalerdia · B1 vs A2')}
+    ${done<SCHEDULE.length?`<div style="background:#1a1200;border:1px solid #5a4000;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#c9a84c;letter-spacing:1px;">⏳ Ligaxka ez da bukatu oraindik — ${done}/${SCHEDULE.length} partida jokatu dira</div>`:''}
+
+    <div class="bracket-round-label" style="color:#5a9fd4;border-bottom-color:#1e3a6a;">FINAL-LAURDENAK</div>
+    <div class="bracket-matches-col">
+      ${bMatch(a1,b4,qf1,'FL1','Uzt. 14','qf','A1','B4')}
+      ${bMatch(a2,b3,qf2,'FL2','Uzt. 14','qf','A2','B3')}
+      ${bMatch(b1,a4,qf3,'FL3','Uzt. 16','qf','B1','A4')}
+      ${bMatch(b2,a3,qf4,'FL4','Uzt. 16','qf','B2','A3')}
     </div>
-    <div class="bracket-section">
-      <h3>FINALA</h3>
-      ${bCard(sf1Win,sf2Win,fin,'FINALA')}
+
+    <div class="bracket-round-label" style="color:#9a6ad4;border-bottom-color:#4a2a6a;">FINALERDIAK</div>
+    <div class="bracket-matches-col">
+      ${bMatch(sf1a,sf1b,sf1,'SF1','Uzt. 21','sf','FL1','FL4')}
+      ${bMatch(sf2a,sf2b,sf2,'SF2','Uzt. 21','sf','FL3','FL2')}
     </div>
-    ${fin?`<div style="background:#0d1a10;border:1px solid #1a7a3a;border-radius:10px;padding:20px;text-align:center;margin-top:20px;">
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4CAF50;letter-spacing:3px;margin-bottom:8px;">🏆 TXAPELDUNA</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:3px;color:#C9A84C;">${fin.sa>fin.sb?sf1Win:sf2Win}</div>
-    </div>`:''}`;
+
+    <div class="bracket-round-label" style="color:#C9A84C;border-bottom-color:#7a6020;">FINALA</div>
+    <div class="bracket-matches-col">
+      ${bMatch(fteamA,fteamB,fin,'FINALA','Uzt. 26','final','SF1','SF2')}
+    </div>
+
+    ${champion?`<div class="champion-box">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4CAF50;letter-spacing:3px;margin-bottom:10px;">🏆 TXAPELDUNA 2026</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;color:#C9A84C;">${champion}</div>
+    </div>`:''}
+  `;
 }
 
-function bCard(pA,pB,res,label) {
-  return `<div class="bracket-match ${res?'jugado':''}">
-    <div class="partido-meta"><span>${label}</span><span>${res?'✓ JOKATUA':'PENDIENTE'}</span></div>
-    <div class="partido-equipos">
-      <div class="equipo-name">${pA}</div>
-      <div class="resultado-display">${res?`${res.sa}–${res.sb}`:'·–·'}</div>
-      <div class="equipo-name right">${pB}</div>
+
+function bMatch(teamA, teamB, res, label, date, type='qf', seedA='', seedB='') {
+  const jugado = !!res;
+  const isTbd = t => t==='?' || t.includes('irabazlea');
+  const winA = res && res.sa > res.sb;
+  const winB = res && res.sb > res.sa;
+  const clsA = jugado?(winA?'winner':'loser'):'';
+  const clsB = jugado?(winB?'winner':'loser'):'';
+  const winner = winA?teamA:winB?teamB:null;
+  const colors = {
+    qf:    {bg:'linear-gradient(135deg,#0a1628,#1a2a4a)', border: jugado?'#1a5c2a':'#1e3a6a', label:'#5a9fd4'},
+    sf:    {bg:'linear-gradient(135deg,#1a0a28,#2e1a4a)', border: jugado?'#1a5c2a':'#4a2a6a', label:'#9a6ad4'},
+    final: {bg:'linear-gradient(135deg,#1a1200,#2e2200)', border: jugado?'#1a5c2a':'#7a6020', label:'#C9A84C'},
+  };
+  const col = colors[type] || colors.qf;
+  const nameA = isTbd(teamA)?`<span class="bm-name tbd">${teamA}</span>`:`<span class="bm-name">${teamA}</span>`;
+  const nameB = isTbd(teamB)?`<span class="bm-name tbd">${teamB}</span>`:`<span class="bm-name">${teamB}</span>`;
+  return `<div class="bm" style="background:${col.bg};border-color:${col.border};">
+    <div class="bm-label" style="color:${col.label};text-align:center;justify-content:center;font-size:11px;letter-spacing:2px;">
+      ${label} &nbsp;·&nbsp; ${date}
     </div>
+    <div class="bm-teams">
+      <div class="bm-team ${clsA}">
+        ${seedA?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${col.label};min-width:22px;font-weight:600;">${seedA}</span>`:''}
+        ${nameA}
+        ${jugado?`<span class="bm-score">${res.sa}</span>`:'<span class="bm-score" style="color:#333;">—</span>'}
+      </div>
+      <div class="bm-vs">· VS ·</div>
+      <div class="bm-team ${clsB}">
+        ${seedB?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${col.label};min-width:22px;font-weight:600;">${seedB}</span>`:''}
+        ${nameB}
+        ${jugado?`<span class="bm-score">${res.sb}</span>`:'<span class="bm-score" style="color:#333;">—</span>'}
+      </div>
+    </div>
+    ${winner?`<div class="bm-winner-tag" style="justify-content:center;">✓ ${winner}</div>`:''}
   </div>`;
 }
+
 
 // ===================== ADMIN =====================
 window.showAdminLogin = () => {
@@ -1148,7 +1240,7 @@ function populateAdminMatchSel() {
     });
     sel.appendChild(og);
   }
-  const koPlayed = [{id:'sf1',label:'1. Finalerdia'},{id:'sf2',label:'2. Finalerdia'},{id:'final',label:'Finala'}]
+  const koPlayed = [{id:'qf1',label:'1. Final-laurdena'},{id:'qf2',label:'2. Final-laurdena'},{id:'qf3',label:'3. Final-laurdena'},{id:'qf4',label:'4. Final-laurdena'},{id:'sf1',label:'1. Finalerdia'},{id:'sf2',label:'2. Finalerdia'},{id:'final',label:'Finala'}]
     .filter(k=>knockoutResults[k.id]);
   if (koPlayed.length) {
     const og2=document.createElement('optgroup');
@@ -1221,7 +1313,7 @@ function renderAdminLog() {
       items.push({label:`J${m.j} · ${m.a} vs ${m.b}`,score:`${r.sa}–${r.sb}`,key,type:'liga'});
     }
   });
-  [{id:'sf1',l:'1. Finalerdia'},{id:'sf2',l:'2. Finalerdia'},{id:'final',l:'Finala'}].forEach(k => {
+  [{id:'qf1',l:'1. FL'},{id:'qf2',l:'2. FL'},{id:'qf3',l:'3. FL'},{id:'qf4',l:'4. FL'},{id:'sf1',l:'1. Finalerdia'},{id:'sf2',l:'2. Finalerdia'},{id:'final',l:'Finala'}].forEach(k => {
     if (knockoutResults[k.id]) {
       const r=knockoutResults[k.id];
       items.push({label:k.l,score:`${r.sa}–${r.sb}`,key:k.id,type:'ko'});
