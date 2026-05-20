@@ -902,11 +902,24 @@ window.openCalPopup = function(dateStr) {
   const dayNames = ['Igandea','Astelehena','Asteartea','Asteazkena','Osteguna','Ostirala','Larunbata'];
   const dayName = dayNames[dateObj.getDay()];
 
-  // Find matches for this date (original or changed)
+  // Find matches for this date
+  // - Show on ORIGINAL date only if: no approved cambio (show as normal or pending cambio)
+  // - Show on NEW date if: approved cambio moves it here
   const dayMatches = SCHEDULE.filter(m => {
-    const efectivo = getEffectiveMatchInfo(MATCH_KEY(m), m.date, m.time, m.ref);
-    const ep = efectivo.date.split('/');
-    return m.date === dateFormatted || `${ep[0]}/${ep[1]}` === dateFormatted;
+    const mKey = MATCH_KEY(m);
+    const cambioEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===mKey && !c.isReserva);
+    const cambio = cambioEntry ? cambioEntry[1] : null;
+    const isApproved = cambio && cambio.status === 'aprobado';
+    const isPending = cambio && cambio.status === 'pendiente';
+
+    if (isApproved) {
+      // Only show on new date, not original
+      const [ny,nmo,nd] = cambio.newDate.split('-');
+      const newFormatted = `${nd}/${nmo}`;
+      return newFormatted === dateFormatted;
+    }
+    // No cambio or pending: show on original date
+    return m.date === dateFormatted;
   });
 
   if (!dayMatches.length) return;
@@ -986,17 +999,27 @@ function renderPartidos() {
     const cambioEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===mKey && !c.isReserva);
     const cambio = cambioEntry ? cambioEntry[1] : null;
     const cambioId = cambioEntry ? cambioEntry[0] : null;
+    // Also check if this match has a pending reserva
+    const reservaEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===mKey && c.isReserva && c.status!=='rechazado');
+    const reserva = reservaEntry ? reservaEntry[1] : null;
+    const reservaId = reservaEntry ? reservaEntry[0] : null;
     const efectivo = getEffectiveMatchInfo(mKey, m.date, m.time, m.ref);
     const cambioHtml = cambio
       ? `<div class='cambio-badge ${cambio.status}' style='display:block;margin-top:6px;'>${
           cambio.status==='pendiente'?'⏳ DATA ALDAKETA ESKATUA':
-          cambio.status==='aprobado'?`✓ DATA ALDATUA: ${efectivo.date} ${efectivo.time}`:
-          '✗ DATA ALDAKETA UKATUA'
+          cambio.status==='aprobado'?`✓ DATA ALDATUA: ${efectivo.date} ${efectivo.time}`:'✗ DATA ALDAKETA UKATUA'
         }</div>${cambio.status==='pendiente' && antolakuntzaUnlocked
           ? `<div style='display:flex;gap:6px;margin-top:6px;'>
               <button class='btn-aprobar' onclick='aprobarCambio("${cambioId}")'>ONARTU</button>
               <button class='btn-rechazar' onclick='rechazarCambio("${cambioId}")'>UKATU</button>
             </div>` : ''}`
+      : reserva && reserva.status==='pendiente'
+      ? `<div class='cambio-badge pendiente' style='display:block;margin-top:6px;'>⏳ DATA ALDAKETA ESKATUA</div>
+         <div style='font-family:IBM Plex Mono,monospace;font-size:10px;color:var(--muted);margin-top:3px;'>${reserva.slotDate} · ${reserva.slotTime}</div>
+         ${antolakuntzaUnlocked?`<div style='display:flex;gap:6px;margin-top:6px;'>
+              <button class='btn-aprobar' onclick='aprobarCambio("${reservaId}")'>ONARTU</button>
+              <button class='btn-rechazar' onclick='rechazarCambio("${reservaId}")'>UKATU</button>
+            </div>`:''}`
       : '';
     return `<div class="partido-card ${jugado?'jugado':'pending'}">
       <div class="partido-meta"><span>${m.group} TALDEA · ${efectivo.date}${efectivo.changed?' 🔄':''} · ${efectivo.time}</span><span>${jugado?'✓ JOKATUA':'PENDIENTE'}</span></div>
@@ -1008,7 +1031,7 @@ function renderPartidos() {
       </div>
       ${cambioHtml}
       ${!jugado && antolakuntzaUnlocked?`<button class="btn-apuntar" onclick='openModal(${JSON.stringify(m)})'>+ EMAITZA SARTU</button>`:''}
-      ${!jugado && !cambio?`<button class="btn-apuntar" style='border-color:#447AB8;color:#447AB8;' onclick='openCambioModal(${JSON.stringify(m)})'>📅 DATA ALDATU</button>`:''}
+      ${!jugado && !cambio && !reserva?`<button class="btn-apuntar" style='border-color:#447AB8;color:#447AB8;' onclick='openCambioModal(${JSON.stringify(m)})'>📅 DATA ALDATU</button>`:''}
     </div>`;
   }).join('');
 }
@@ -1483,6 +1506,35 @@ window.aprobarCambio = async function(cambioId) {
   if (!c) return;
   try {
     await fbSet('cambios', cambioId, {...c, status: 'aprobado'});
+
+    // If this is a reserva, also create a regular cambio for the match
+    if (c.isReserva) {
+      // Find original match to get its date/time
+      const match = SCHEDULE.find(m => MATCH_KEY(m) === c.matchKey);
+      if (match) {
+        // Find the slot's original referee (the one who had that slot)
+        const slotMatch = SCHEDULE.find(m => m.date === c.slotDate && m.time === c.slotTime);
+        const newRef = slotMatch ? slotMatch.ref : match.ref;
+        // Convert slotDate dd/mm to YYYY-MM-DD
+        const [sd, sm] = c.slotDate.split('/');
+        const newDateISO = `2026-${sm.padStart(2,'0')}-${sd.padStart(2,'0')}`;
+        const regularCambioId = `cambio_${c.matchKey}_reserva_${Date.now()}`;
+        await fbSet('cambios', regularCambioId, {
+          matchKey: c.matchKey,
+          matchA: match.a,
+          matchB: match.b,
+          jornada: match.j,
+          originalDate: match.date,
+          originalTime: match.time,
+          newDate: newDateISO,
+          newTime: c.slotTime,
+          newRef: newRef,
+          status: 'aprobado',
+          fromReserva: cambioId,
+          createdAt: Date.now()
+        });
+      }
+    }
     showToast('Onartuta ✓');
   } catch(e) { showToast('Errorea', true); }
 };
@@ -1563,7 +1615,12 @@ function renderDatak() {
       c.isReserva && c.slotDate===slot.date && c.slotTime===slot.time && c.status!=='rechazado'
     );
     const statusHtml = reserved
-      ? `<div class="cambio-badge ${reserved.status==='aprobado'?'aprobado':'pendiente'}">${reserved.status==='aprobado'?'✓ ERRESERBATUA':'⏳ ESKAERA BIDALITA'}</div>`
+      ? `<div class="cambio-badge ${reserved.status==='aprobado'?'aprobado':'pendiente'}" style="display:block;margin-top:8px;">
+          ${reserved.status==='aprobado'?'✓ ERRESERBATUA':'⏳ ERRESERBA ESKATUA'}
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#C9A84C;margin-top:4px;letter-spacing:0.5px;">
+          ${reserved.jornada}. jardunaldia · ${reserved.matchA} vs ${reserved.matchB}
+        </div>`
       : `<button class="btn-apuntar" style="margin-top:10px;" onclick="openReservaModal('${slot.date}','${slot.time}','${slot.id}')">+ ERRESERBATU</button>`;
     return `<div class="data-libre-card">
       <div class="data-libre-date">${slot.date} · ${slot.time}</div>
