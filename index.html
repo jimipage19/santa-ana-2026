@@ -100,6 +100,8 @@
   .partidos-list { display: flex; flex-direction: column; gap: 10px; }
   .partido-card { background: #141414; border: 1px solid #2a2a2a; border-radius: 8px; padding: 14px 16px; }
   .partido-card.jugado { border-left: 3px solid var(--green); }
+  .partido-card.cambiado { border-left: 3px solid var(--gold); }
+  .partido-card.cambio-pending { border-left: 3px solid #5a4000; }
   .partido-card.pending { border-left: 3px solid #333; }
   .partido-meta { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--cream); letter-spacing: 1px; margin-bottom: 10px; display: flex; justify-content: space-between; }
   .partido-equipos { display: flex; align-items: center; gap: 8px; }
@@ -815,19 +817,50 @@ let calMonth = 4; // 0-indexed, 4 = May
 let selectedCalDate = null; // YYYY-MM-DD
 
 function getMatchDates() {
-  // Returns a map of YYYY-MM-DD -> array of matches
   const map = {};
   SCHEDULE.forEach(m => {
-    const [d, mo] = m.date.split('/');
-    const key = `2026-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
-    if (!map[key]) map[key] = [];
-    map[key].push(m);
-  });
-  // Also include approved cambio dates
-  Object.values(cambios).filter(c => c.status==='aprobado' && !c.isReserva).forEach(c => {
-    if (!map[c.newDate]) map[c.newDate] = [];
+    const mKey = MATCH_KEY(m);
+    // Find any approved cambio for this match
+    const cambioApproved = Object.values(cambios).find(c =>
+      c.status==='aprobado' && (
+        c.matchKey===mKey ||
+        (c.matchA===m.a && c.matchB===m.b && c.jornada==m.j)
+      )
+    );
+    let dateKey;
+    if (cambioApproved && !cambioApproved.isReserva && cambioApproved.newDate) {
+      // Regular cambio: newDate is YYYY-MM-DD
+      dateKey = cambioApproved.newDate;
+    } else if (cambioApproved && cambioApproved.isReserva && cambioApproved.slotDate) {
+      // Reserva: slotDate is dd/mm
+      const [sd,sm] = cambioApproved.slotDate.split('/');
+      dateKey = `2026-${sm.padStart(2,'0')}-${sd.padStart(2,'0')}`;
+    } else {
+      // No cambio: use original date dd/mm
+      const [d, mo] = m.date.split('/');
+      dateKey = `2026-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    }
+    if (!map[dateKey]) map[dateKey] = [];
+    map[dateKey].push(m);
   });
   return map;
+}
+
+function debugCambios() {
+  console.log("=== CAMBIOS DEBUG ===");
+  console.log("Total cambios:", Object.keys(cambios).length);
+  Object.entries(cambios).forEach(([id,c]) => {
+    console.log("ID:", id);
+    console.log("  matchA:", c.matchA, "matchB:", c.matchB, "jornada:", c.jornada, typeof c.jornada);
+    console.log("  isReserva:", c.isReserva, "status:", c.status);
+    console.log("  slotDate:", c.slotDate, "slotTime:", c.slotTime);
+  });
+  // Test specific match
+  const testA = "Bueno / Urkola", testB = "Iparragirre / Astiazaran", testJ = 3;
+  const found = Object.values(cambios).find(c =>
+    c.matchA===testA && c.matchB===testB && c.jornada==testJ && c.status==="aprobado"
+  );
+  console.log("Found for Bueno/Urkola:", found ? "YES" : "NO");
 }
 
 function renderCalendar() {
@@ -907,7 +940,7 @@ window.openCalPopup = function(dateStr) {
   // - Show on NEW date if: approved cambio moves it here
   const dayMatches = SCHEDULE.filter(m => {
     const mKey = MATCH_KEY(m);
-    const cambioEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===mKey && !c.isReserva);
+    const cambioEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===mKey && !c.isReserva && c.status!=='rechazado');
     const cambio = cambioEntry ? cambioEntry[1] : null;
     const isApproved = cambio && cambio.status === 'aprobado';
     const isPending = cambio && cambio.status === 'pendiente';
@@ -940,7 +973,7 @@ window.openCalPopup = function(dateStr) {
     const key = MATCH_KEY(m);
     const res = results[key];
     const jugado = !!res;
-    const efectivo = getEffectiveMatchInfo(key, m.date, m.time, m.ref);
+    const efectivo = getEffectiveMatchInfo(key, m.date, m.time, m.ref, m.a, m.b, m.j);
     const cambioEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===key && !c.isReserva);
     const cambio = cambioEntry ? cambioEntry[1] : null;
     const isChanged = cambio && cambio.status==='aprobado';
@@ -996,18 +1029,24 @@ function renderPartidos() {
     const key=MATCH_KEY(m), res=results[key], jugado=!!res;
     // Check for cambio
     const mKey = MATCH_KEY(m);
-    const cambioEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===mKey && !c.isReserva);
+    // Find any active cambio using matchKey or matchA+matchB+jornada fallback
+    const cambioEntry = Object.entries(cambios).find(([id,c]) =>
+      c.status!=='rechazado' && (
+        c.matchKey===mKey ||
+        (c.matchA===m.a && c.matchB===m.b && c.jornada==m.j)
+      ) && (!c.isReserva || c.status==='aprobado')
+    );
     const cambio = cambioEntry ? cambioEntry[1] : null;
     const cambioId = cambioEntry ? cambioEntry[0] : null;
-    // Also check if this match has a pending reserva
-    const reservaEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===mKey && c.isReserva && c.status!=='rechazado');
+    // Also check if this match has a pending reserva (only if no regular cambio exists)
+    const reservaEntry = !cambio ? Object.entries(cambios).find(([id,c]) => c.matchKey===mKey && c.isReserva && c.status==='pendiente') : null;
     const reserva = reservaEntry ? reservaEntry[1] : null;
     const reservaId = reservaEntry ? reservaEntry[0] : null;
-    const efectivo = getEffectiveMatchInfo(mKey, m.date, m.time, m.ref);
+    const efectivo = getEffectiveMatchInfo(mKey, m.date, m.time, m.ref, m.a, m.b, m.j);
     const cambioHtml = cambio
       ? `<div class='cambio-badge ${cambio.status}' style='display:block;margin-top:6px;'>${
           cambio.status==='pendiente'?'⏳ DATA ALDAKETA ESKATUA':
-          cambio.status==='aprobado'?`✓ DATA ALDATUA: ${efectivo.date} ${efectivo.time}`:'✗ DATA ALDAKETA UKATUA'
+          cambio.status==='aprobado'?`✓ DATA ALDATUA: ${efectivo.date} · ${efectivo.time}`:'✗ DATA ALDAKETA UKATUA'
         }</div>${cambio.status==='pendiente' && antolakuntzaUnlocked
           ? `<div style='display:flex;gap:6px;margin-top:6px;'>
               <button class='btn-aprobar' onclick='aprobarCambio("${cambioId}")'>ONARTU</button>
@@ -1021,7 +1060,10 @@ function renderPartidos() {
               <button class='btn-rechazar' onclick='rechazarCambio("${reservaId}")'>UKATU</button>
             </div>`:''}`
       : '';
-    return `<div class="partido-card ${jugado?'jugado':'pending'}">
+    const isChanged = (cambio && cambio.status==='aprobado') || (reserva && reserva.status==='aprobado');
+    const isPendingChange = (cambio && cambio.status==='pendiente') || (reserva && reserva.status==='pendiente');
+    const cardClass = jugado?'jugado':isChanged?'cambiado':isPendingChange?'cambio-pending':'pending';
+    return `<div class="partido-card ${cardClass}">
       <div class="partido-meta"><span>${m.group} TALDEA · ${efectivo.date}${efectivo.changed?' 🔄':''} · ${efectivo.time}</span><span>${jugado?'✓ JOKATUA':'PENDIENTE'}</span></div>
       <div class="partido-ref">EPAILEA: ${efectivo.ref || m.ref}${efectivo.changed && efectivo.ref!==m.ref?' 🔄':''}</div>
       <div class="partido-equipos">
@@ -1557,36 +1599,47 @@ window.deleteCambio = async function(cambioId) {
 };
 
 // Get effective date/time for a match (considering approved cambios)
-function getEffectiveMatchInfo(matchKey, originalDate, originalTime, originalRef) {
-  const approved = Object.values(cambios).find(c =>
-    c.matchKey===matchKey && c.status==='aprobado' && !c.isReserva
+function findCambioForMatch(matchKey, matchA, matchB, jornada) {
+  // Try exact matchKey first, then fallback to matchA+matchB+jornada
+  return Object.values(cambios).find(c =>
+    c.status==='aprobado' && (
+      c.matchKey===matchKey ||
+      (c.matchA===matchA && c.matchB===matchB && c.jornada==jornada)
+    )
   );
-  if (approved) return { date: formatDateES(approved.newDate), time: approved.newTime, ref: approved.newRef || originalRef, changed: true };
-  // Check if a reserva was approved for this match
-  const reservaApproved = Object.values(cambios).find(c =>
-    c.matchKey===matchKey && c.status==='aprobado' && c.isReserva
-  );
-  if (reservaApproved) {
-    // Find the original match at the reserved slot to get its referee
-    const slotMatch = SCHEDULE.find(m =>
-      m.date===reservaApproved.slotDate && m.time===reservaApproved.slotTime
-    );
-    return { date: reservaApproved.slotDate, time: reservaApproved.slotTime, ref: slotMatch ? slotMatch.ref : originalRef, changed: true };
+}
+
+function getEffectiveMatchInfo(matchKey, originalDate, originalTime, originalRef, matchA, matchB, jornada) {
+  const approved = findCambioForMatch(matchKey, matchA, matchB, jornada);
+  if (!approved) return { date: originalDate, time: originalTime, ref: originalRef, changed: false };
+
+  if (!approved.isReserva && approved.newDate) {
+    // Regular cambio: newDate is YYYY-MM-DD
+    return { date: formatDateES(approved.newDate), time: approved.newTime, ref: approved.newRef || originalRef, changed: true };
+  }
+  if (approved.isReserva && approved.slotDate) {
+    // Reserva: slotDate is dd/mm
+    const slotMatch = SCHEDULE.find(m => m.date===approved.slotDate && m.time===approved.slotTime);
+    const newRef = slotMatch ? slotMatch.ref : originalRef;
+    const [sd,sm] = approved.slotDate.split('/');
+    return { date: `${sd}/${sm}/2026`, time: approved.slotTime, ref: newRef, changed: true };
   }
   return { date: originalDate, time: originalTime, ref: originalRef, changed: false };
 }
 
 // Get freed slots (original dates of approved cambios)
 function getFreedSlots() {
-  return Object.entries(cambios)
-    .filter(([id,c]) => c.status==='aprobado')
-    .map(([id,c]) => ({
-      id,
-      date: c.originalDate,
-      time: c.originalTime,
-      fromMatch: `${c.matchA} vs ${c.matchB}`,
-      jornada: c.jornada
-    }));
+  // Only regular cambios (not reservas, not fromReserva auto-created)
+  // A freed slot = original date of an approved regular cambio
+  const regularApproved = Object.entries(cambios)
+    .filter(([id,c]) => c.status==='aprobado' && !c.isReserva && !c.fromReserva);
+  return regularApproved.map(([id,c]) => ({
+    id,
+    date: c.originalDate,
+    time: c.originalTime,
+    fromMatch: `${c.matchA} vs ${c.matchB}`,
+    jornada: c.jornada
+  }));
 }
 
 function renderDatak() {
@@ -1614,10 +1667,10 @@ function renderDatak() {
     const reserved = Object.values(cambios).find(c =>
       c.isReserva && c.slotDate===slot.date && c.slotTime===slot.time && c.status!=='rechazado'
     );
-    const statusHtml = reserved
-      ? `<div class="cambio-badge ${reserved.status==='aprobado'?'aprobado':'pendiente'}" style="display:block;margin-top:8px;">
-          ${reserved.status==='aprobado'?'✓ ERRESERBATUA':'⏳ ERRESERBA ESKATUA'}
-        </div>
+    // If reserva is approved, slot is taken — skip rendering it
+    if (reserved && reserved.status==='aprobado') return '';
+    const statusHtml = reserved && reserved.status==='pendiente'
+      ? `<div class="cambio-badge pendiente" style="display:block;margin-top:8px;">⏳ ERRESERBA ESKATUA</div>
         <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#C9A84C;margin-top:4px;letter-spacing:0.5px;">
           ${reserved.jornada}. jardunaldia · ${reserved.matchA} vs ${reserved.matchB}
         </div>`
@@ -1779,6 +1832,7 @@ async function initVisitCounter() {
 function renderAll() {
   renderStandings(); renderPartidos(); renderBracket();
   if (antolakuntzaUnlocked) renderAdminLog();
+  debugCambios();
 }
 
 initPairSelector();
