@@ -924,18 +924,16 @@ window.openCalPopup = function(dateStr) {
   // - Show on NEW date if: approved cambio moves it here
   const dayMatches = SCHEDULE.filter(m => {
     const mKey = MATCH_KEY(m);
-    const cambioEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===mKey && !c.isReserva && c.status!=='rechazado');
-    const cambio = cambioEntry ? cambioEntry[1] : null;
-    const isApproved = cambio && cambio.status === 'aprobado';
-    const isPending = cambio && cambio.status === 'pendiente';
+    // Use getEffectiveMatchInfo which handles both regular cambios and reservas
+    const efectivo = getEffectiveMatchInfo(mKey, m.date, m.time, m.ref, m.a, m.b, m.j);
 
-    if (isApproved) {
-      // Only show on new date, not original
-      const [ny,nmo,nd] = cambio.newDate.split('-');
-      const newFormatted = `${nd}/${nmo}`;
-      return newFormatted === dateFormatted;
+    if (efectivo.changed) {
+      // Show on new effective date only
+      const ep = efectivo.date.split('/'); // dd/mm/yyyy or dd/mm
+      const epFormatted = `${ep[0]}/${ep[1]}`;
+      return epFormatted === dateFormatted;
     }
-    // No cambio or pending: show on original date
+    // Check if there's a pending cambio - show on original date
     return m.date === dateFormatted;
   });
 
@@ -1602,9 +1600,12 @@ function getEffectiveMatchInfo(matchKey, originalDate, originalTime, originalRef
     return { date: formatDateES(approved.newDate), time: approved.newTime, ref: approved.newRef || originalRef, changed: true };
   }
   if (approved.isReserva && approved.slotDate) {
-    // Reserva: slotDate is dd/mm
-    const slotMatch = SCHEDULE.find(m => m.date===approved.slotDate && m.time===approved.slotTime);
-    const newRef = slotMatch ? slotMatch.ref : originalRef;
+    // Reserva: use saved slotRef, fallback to searching SCHEDULE
+    let newRef = approved.slotRef || '';
+    if (!newRef) {
+      const slotMatch = SCHEDULE.find(m => m.date===approved.slotDate && m.time===approved.slotTime && m.ref);
+      newRef = slotMatch ? slotMatch.ref : originalRef;
+    }
     const [sd,sm] = approved.slotDate.split('/');
     return { date: `${sd}/${sm}/2026`, time: approved.slotTime, ref: newRef, changed: true };
   }
@@ -1745,6 +1746,9 @@ window.submitReserva = async function() {
   if (!slot) { errEl.textContent = '⚠ Errorea'; return; }
 
   const match = SCHEDULE.find(m => MATCH_KEY(m)===matchKey);
+  // Find the referee of the original match at that slot
+  const slotOriginalMatch = SCHEDULE.find(m => m.date===slot.originalDate && m.time===slot.originalTime);
+  const slotRef = slotOriginalMatch ? slotOriginalMatch.ref : '';
   const reservaId = `reserva_${matchKey}_${Date.now()}`;
   try {
     await fbSet('cambios', reservaId, {
@@ -1752,6 +1756,7 @@ window.submitReserva = async function() {
       slotId: currentReservaSlotId,
       slotDate: slot.originalDate,
       slotTime: slot.originalTime,
+      slotRef: slotRef,
       matchKey,
       matchA: match.a,
       matchB: match.b,
