@@ -669,6 +669,7 @@ function initFirebase() {
     snap.forEach(d => { cambios[d.id] = d.data(); });
     renderPartidos();
     renderDatak();
+    renderCalendar();
     if (antolakuntzaUnlocked) renderCambiosLog();
   });
 }
@@ -844,23 +845,6 @@ function getMatchDates() {
     map[dateKey].push(m);
   });
   return map;
-}
-
-function debugCambios() {
-  console.log("=== CAMBIOS DEBUG ===");
-  console.log("Total cambios:", Object.keys(cambios).length);
-  Object.entries(cambios).forEach(([id,c]) => {
-    console.log("ID:", id);
-    console.log("  matchA:", c.matchA, "matchB:", c.matchB, "jornada:", c.jornada, typeof c.jornada);
-    console.log("  isReserva:", c.isReserva, "status:", c.status);
-    console.log("  slotDate:", c.slotDate, "slotTime:", c.slotTime);
-  });
-  // Test specific match
-  const testA = "Bueno / Urkola", testB = "Iparragirre / Astiazaran", testJ = 3;
-  const found = Object.values(cambios).find(c =>
-    c.matchA===testA && c.matchB===testB && c.jornada==testJ && c.status==="aprobado"
-  );
-  console.log("Found for Bueno/Urkola:", found ? "YES" : "NO");
 }
 
 function renderCalendar() {
@@ -1832,7 +1816,6 @@ async function initVisitCounter() {
 function renderAll() {
   renderStandings(); renderPartidos(); renderBracket();
   if (antolakuntzaUnlocked) renderAdminLog();
-  debugCambios();
 }
 
 initPairSelector();
