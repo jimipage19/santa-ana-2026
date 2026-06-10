@@ -404,6 +404,21 @@
         <h3>Emaitzak ezabatu</h3>
         <div class="results-log" id="results-log"></div>
       </div>
+      <div class="admin-panel">
+        <h3>Bikote batek abandonatu</h3>
+        <p style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);line-height:1.5;margin-bottom:12px;">
+          Bikote bat abandonatu duela markatzean: jokatutako partida guztiak ezeztatuko dira,
+          jokatu gabekoak libratuko dira (huekoak), eta sailkapenean marratuta agertuko da.
+        </p>
+        <div class="form-row">
+          <label>BIKOTEA</label>
+          <select id="abandon-sel">
+            <option value="">— Aukeratu bikotea —</option>
+          </select>
+        </div>
+        <button class="btn-save" style="background:#A82028;" onclick="marcarAbandono()">ABANDONATU DUELA MARKATU</button>
+        <div class="results-log" id="abandon-log" style="margin-top:16px;"></div>
+      </div>
       <div class="admin-panel" id="admin-edit-cambio-panel" style="display:none">
         <h3>Data aldaketa editatu</h3>
         <div class="form-row"><label>PARTIDA</label><div id="admin-edit-cambio-label" style="font-size:13px;color:var(--cream-dark);padding:8px 0;"></div></div>
@@ -512,8 +527,8 @@
         <input type="time" id="cambio-time" style="width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:var(--cream);font-family:'IBM Plex Sans',sans-serif;font-size:14px;outline:none;color-scheme:dark;">
       </div>
       <div class="form-row">
-        <label>EPAILE BERRIA</label>
-        <input type="text" id="cambio-ref" placeholder="Idatzi epaileak..." style="width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:var(--cream);font-family:'IBM Plex Sans',sans-serif;font-size:14px;outline:none;">
+        <label>EPAILE BERRIA <span style="color:var(--muted);font-weight:400;">(aukerakoa)</span></label>
+        <input type="text" id="cambio-ref" placeholder="Idatzi epaileak... (aukerakoa)" style="width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #444;border-radius:6px;color:var(--cream);font-family:'IBM Plex Sans',sans-serif;font-size:14px;outline:none;">
       </div>
       <div id="cambio-error" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#ff4466;min-height:18px;margin-bottom:8px;font-weight:600;"></div>
       <div class="modal-btns">
@@ -637,13 +652,55 @@ const SCHEDULE = [
 
 const ANTOLAKUNTZA_PIN = "1990";
 const MATCH_KEY = m => `j${m.j}_${m.group}_${m.a}_${m.b}`.replace(/[\s\/]/g,'_');
+const ABANDON_ID = pair => pair.replace(/[\s\/]/g,'_');
 
 // ===================== STATE =====================
 let results = {};
 let knockoutResults = {};
-let selectedJornada = 1;
+let abandonos = {};
+let selectedJornada = getCurrentJornada();
 let currentMatch = null;
 let antolakuntzaUnlocked = false;
+
+// Jornada relevant to "now": the one with matches in the current week,
+// else the next upcoming jornada, else the last one.
+function getCurrentJornada() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  // Current week (Monday → Sunday)
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - ((today.getDay()+6)%7));
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  // Build jornada date ranges from SCHEDULE
+  const ranges = {};
+  SCHEDULE.forEach(m => {
+    const [d,mo] = m.date.split('/');
+    const iso = new Date(`2026-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`);
+    if (!ranges[m.j]) ranges[m.j] = {min:iso, max:iso};
+    if (iso < ranges[m.j].min) ranges[m.j].min = iso;
+    if (iso > ranges[m.j].max) ranges[m.j].max = iso;
+  });
+  const js = Object.keys(ranges).map(Number).sort((a,b)=>a-b);
+  // 1. A jornada with matches in the current week
+  for (const j of js) {
+    if (ranges[j].max >= weekStart && ranges[j].min <= weekEnd) return j;
+  }
+  // 2. Today within a jornada's range (long gaps / changed dates)
+  for (const j of js) {
+    if (today >= ranges[j].min && today <= ranges[j].max) return j;
+  }
+  // 3. Next upcoming jornada
+  for (const j of js) {
+    if (ranges[j].min >= today) return j;
+  }
+  // 4. Tournament finished → last jornada
+  return js.length ? js[js.length-1] : 1;
+}
+
+// True if a pair has abandoned the tournament
+function isAbandoned(pair) {
+  return Object.values(abandonos).some(a => a.pair === pair);
+}
 
 // ===================== FIREBASE =====================
 function initFirebase() {
@@ -671,6 +728,16 @@ function initFirebase() {
     renderDatak();
     renderCalendar();
     if (antolakuntzaUnlocked) renderCambiosLog();
+  });
+
+  onSnapshot(collection(db, 'abandonos'), snap => {
+    abandonos = {};
+    snap.forEach(d => { abandonos[d.id] = d.data(); });
+    renderStandings();
+    renderPartidos();
+    renderDatak();
+    renderCalendar();
+    if (antolakuntzaUnlocked) renderAbandonAdmin();
   });
 }
 
@@ -796,10 +863,17 @@ function renderStandings() {
     document.getElementById(`standings-${g.toLowerCase()}`).innerHTML = rows.map((r,i) => {
       const posLabel = g+(i+1);
       const diff = r.tf-r.tc;
-      const badgeBg = i<2?'#1A7A3A':i<4?'#447AB8':'#2a2a2a';
-      const nameColor = i<2?'#4CAF50':i<4?'#7ab8e8':'var(--cream-dark)';
-      return `<tr>
-        <td><span class="pos-badge" style="background:${badgeBg};color:white;font-size:10px;">${posLabel}</span><span class="pair-name" style="color:${nameColor}">${r.name}</span></td>
+      const abandoned = isAbandoned(r.name);
+      const badgeBg = abandoned?'#2a2a2a':i<2?'#1A7A3A':i<4?'#447AB8':'#2a2a2a';
+      const nameColor = abandoned?'var(--muted)':i<2?'#4CAF50':i<4?'#7ab8e8':'var(--cream-dark)';
+      const nameStyle = abandoned
+        ? `color:${nameColor};text-decoration:line-through;opacity:0.65;`
+        : `color:${nameColor}`;
+      const abandonTag = abandoned
+        ? `<span style="display:inline-block;margin-left:6px;font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:0.5px;color:var(--red);border:1px solid var(--red);border-radius:3px;padding:1px 4px;vertical-align:middle;">ABANDONATU DU</span>`
+        : '';
+      return `<tr${abandoned?' style="opacity:0.7;"':''}>
+        <td><span class="pos-badge" style="background:${badgeBg};color:white;font-size:10px;">${abandoned?'—':posLabel}</span><span class="pair-name" style="${nameStyle}">${r.name}</span>${abandonTag}</td>
         <td>${r.p}</td><td>${r.w}</td><td>${r.l}</td><td>${r.tf}</td><td>${r.tc}</td>
         <td class="${diff>0?'dif-pos':diff<0?'dif-neg':'dif-cell'}">${diff>0?'+'+diff:diff}</td>
         <td class="pts-cell">${r.pts}</td>
@@ -813,34 +887,24 @@ const MONTHS_EU = ['Urtarrila','Otsaila','Martxoa','Apirila','Maiatza','Ekaina',
                    'Uztaila','Abuztua','Iraila','Urria','Azaroa','Abendua'];
 const DAYS_EU = ['AL','AR','AZ','OG','OR','LA','IG'];
 
-let calYear = 2026;
-let calMonth = 4; // 0-indexed, 4 = May
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth(); // 0-indexed, starts on the current month
 let selectedCalDate = null; // YYYY-MM-DD
 
 function getMatchDates() {
   const map = {};
   SCHEDULE.forEach(m => {
+    // Skip matches of abandoned pairs — they are annulled/freed, not played
+    if (isAbandoned(m.a) || isAbandoned(m.b)) return;
     const mKey = MATCH_KEY(m);
-    // Find any approved cambio for this match
-    const cambioApproved = Object.values(cambios).find(c =>
-      c.status==='aprobado' && (
-        c.matchKey===mKey ||
-        (c.matchA===m.a && c.matchB===m.b && c.jornada==m.j)
-      )
-    );
-    let dateKey;
-    if (cambioApproved && !cambioApproved.isReserva && cambioApproved.newDate) {
-      // Regular cambio: newDate is YYYY-MM-DD
-      dateKey = cambioApproved.newDate;
-    } else if (cambioApproved && cambioApproved.isReserva && cambioApproved.slotDate) {
-      // Reserva: slotDate is dd/mm
-      const [sd,sm] = cambioApproved.slotDate.split('/');
-      dateKey = `2026-${sm.padStart(2,'0')}-${sd.padStart(2,'0')}`;
-    } else {
-      // No cambio: use original date dd/mm
-      const [d, mo] = m.date.split('/');
-      dateKey = `2026-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
-    }
+    // Single source of truth: use the SAME effective-date logic as the popup
+    // and Partidak (getEffectiveMatchInfo → findCambioForMatch). This keeps the
+    // calendar dot and the day popup perfectly in sync for both regular cambios
+    // and reservas (Huekoak).
+    const eff = getEffectiveMatchInfo(mKey, m.date, m.time, m.ref, m.a, m.b, m.j);
+    // eff.date is dd/mm/yyyy (changed) or dd/mm (original) → normalize to ISO
+    const parts = eff.date.split('/');
+    const dateKey = `2026-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
     if (!map[dateKey]) map[dateKey] = [];
     map[dateKey].push(m);
   });
@@ -923,17 +987,19 @@ window.openCalPopup = function(dateStr) {
   // - Show on ORIGINAL date only if: no approved cambio (show as normal or pending cambio)
   // - Show on NEW date if: approved cambio moves it here
   const dayMatches = SCHEDULE.filter(m => {
+    // Abandoned pairs' matches are annulled/freed — never shown
+    if (isAbandoned(m.a) || isAbandoned(m.b)) return false;
     const mKey = MATCH_KEY(m);
     // Use getEffectiveMatchInfo which handles both regular cambios and reservas
     const efectivo = getEffectiveMatchInfo(mKey, m.date, m.time, m.ref, m.a, m.b, m.j);
 
     if (efectivo.changed) {
-      // Show on new effective date only
+      // Show on new effective date only (normalize to dd/mm zero-padded)
       const ep = efectivo.date.split('/'); // dd/mm/yyyy or dd/mm
-      const epFormatted = `${ep[0]}/${ep[1]}`;
+      const epFormatted = `${ep[0].padStart(2,'0')}/${ep[1].padStart(2,'0')}`;
       return epFormatted === dateFormatted;
     }
-    // Check if there's a pending cambio - show on original date
+    // Not changed (no approved cambio) — show on original date
     return m.date === dateFormatted;
   });
 
@@ -956,14 +1022,18 @@ window.openCalPopup = function(dateStr) {
     const res = results[key];
     const jugado = !!res;
     const efectivo = getEffectiveMatchInfo(key, m.date, m.time, m.ref, m.a, m.b, m.j);
-    const cambioEntry = Object.entries(cambios).find(([id,c]) => c.matchKey===key && !c.isReserva);
-    const cambio = cambioEntry ? cambioEntry[1] : null;
-    const isChanged = cambio && cambio.status==='aprobado';
-    const isPending = cambio && cambio.status==='pendiente';
+    const isChanged = efectivo.changed;
+    // A pending (not yet approved) regular cambio for the badge
+    const pendingEntry = Object.entries(cambios).find(([id,c]) =>
+      !c.isReserva && c.status==='pendiente' && (
+        c.matchKey===key || (c.matchA===m.a && c.matchB===m.b && c.jornada==m.j)
+      )
+    );
+    const isPending = !isChanged && !!pendingEntry;
     const cardBorder = isChanged ? '#C9A84C' : isPending ? '#5a4000' : jugado ? 'var(--green)' : '#333';
     return `<div class="cal-popup-match" style="border-left-color:${cardBorder}">
       <div class="cal-popup-meta">
-        <span>${m.group} · ${m.time}</span>
+        <span>${m.group} · ${efectivo.time}</span>
         <span>${jugado?'✓ JOKATUA':isChanged?'DATA ALDATUA':isPending?'⏳ ALDAKETA ESKATUA':'PENDIENTE'}</span>
       </div>
       <div class="cal-popup-equipos">
@@ -971,8 +1041,8 @@ window.openCalPopup = function(dateStr) {
         <div class="cal-popup-score">${jugado?`${res.sa}–${res.sb}`:'·–·'}</div>
         <div class="cal-popup-name right">${m.b}</div>
       </div>
-      <div class="cal-popup-ref">EPAILEA: ${m.ref}</div>
-      ${isChanged?`<div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#C9A84C;margin-top:6px;letter-spacing:1px;">🔄 DATA ALDATUA → ${formatDateES(cambio.newDate)} · ${cambio.newTime}</div>`:''}
+      <div class="cal-popup-ref">EPAILEA: ${efectivo.ref || m.ref}</div>
+      ${isChanged?`<div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#C9A84C;margin-top:6px;letter-spacing:1px;">🔄 DATA ALDATUA → ${efectivo.date} · ${efectivo.time}</div>`:''}
       ${isPending?'<div class="cambio-badge pendiente" style="margin-top:6px;display:block;">⏳ DATA ALDAKETA ESKATUA</div>':''}
     </div>`;
   }).join('');
@@ -1044,18 +1114,27 @@ function renderPartidos() {
       : '';
     const isChanged = (cambio && cambio.status==='aprobado') || (reserva && reserva.status==='aprobado');
     const isPendingChange = (cambio && cambio.status==='pendiente') || (reserva && reserva.status==='pendiente');
-    const cardClass = jugado?'jugado':isChanged?'cambiado':isPendingChange?'cambio-pending':'pending';
-    return `<div class="partido-card ${cardClass}">
-      <div class="partido-meta"><span>${m.group} TALDEA · ${efectivo.date}${efectivo.changed?' 🔄':''} · ${efectivo.time}</span><span>${jugado?'✓ JOKATUA':'PENDIENTE'}</span></div>
+    // A participant abandoned the tournament → this match is annulled/freed
+    const abandonA = isAbandoned(m.a), abandonB = isAbandoned(m.b);
+    const hasAbandon = abandonA || abandonB;
+    const cardClass = hasAbandon?'pending':jugado?'jugado':isChanged?'cambiado':isPendingChange?'cambio-pending':'pending';
+    const abandonHtml = hasAbandon
+      ? `<div class='cambio-badge' style='display:block;margin-top:6px;background:#3a0d10;color:#ff8a90;border:1px solid var(--red);'>🚫 BERTAN BEHERA: ${abandonA?m.a:m.b} abandonatu du</div>`
+      : '';
+    const nameAStyle = abandonA?'text-decoration:line-through;opacity:0.6;':'';
+    const nameBStyle = abandonB?'text-decoration:line-through;opacity:0.6;':'';
+    return `<div class="partido-card ${cardClass}"${hasAbandon?' style="opacity:0.85;"':''}>
+      <div class="partido-meta"><span>${m.group} TALDEA · ${efectivo.date}${efectivo.changed?' 🔄':''} · ${efectivo.time}</span><span>${hasAbandon?'BERTAN BEHERA':jugado?'✓ JOKATUA':'PENDIENTE'}</span></div>
       <div class="partido-ref">EPAILEA: ${efectivo.ref || m.ref}${efectivo.changed && efectivo.ref!==m.ref?' 🔄':''}</div>
       <div class="partido-equipos">
-        <div class="equipo-name">${m.a}</div>
-        <div class="resultado-display">${jugado?`${res.sa}–${res.sb}`:'·–·'}</div>
-        <div class="equipo-name right">${m.b}</div>
+        <div class="equipo-name" style="${nameAStyle}">${m.a}</div>
+        <div class="resultado-display">${(!hasAbandon && jugado)?`${res.sa}–${res.sb}`:'·–·'}</div>
+        <div class="equipo-name right" style="${nameBStyle}">${m.b}</div>
       </div>
-      ${cambioHtml}
-      ${!jugado && antolakuntzaUnlocked?`<button class="btn-apuntar" onclick='openModal(${JSON.stringify(m)})'>+ EMAITZA SARTU</button>`:''}
-      ${!jugado && !cambio && !reserva?`<button class="btn-apuntar" style='border-color:#447AB8;color:#447AB8;' onclick='openCambioModal(${JSON.stringify(m)})'>📅 DATA ALDATU</button>`:''}
+      ${abandonHtml}
+      ${hasAbandon ? '' : cambioHtml}
+      ${!hasAbandon && !jugado && antolakuntzaUnlocked?`<button class="btn-apuntar" onclick='openModal(${JSON.stringify(m)})'>+ EMAITZA SARTU</button>`:''}
+      ${!hasAbandon && !jugado && !cambio && !reserva?`<button class="btn-apuntar" style='border-color:#447AB8;color:#447AB8;' onclick='openCambioModal(${JSON.stringify(m)})'>📅 DATA ALDATU</button>`:''}
     </div>`;
   }).join('');
 }
@@ -1264,6 +1343,7 @@ window.checkAdmin = () => {
     populateAdminMatchSel();
     renderAdminLog();
     renderCambiosLog();
+    renderAbandonAdmin();
     renderPartidos();
   } else {
     document.getElementById('pin-error').textContent='Pasahitz okerra';
@@ -1400,6 +1480,7 @@ window.showToast = (msg, isError=false) => {
 let cambios = {};
 let currentCambioMatch = null;
 let currentReservaSlotId = null;
+let currentReservaSlotInfo = null;
 
 // Occupied slots by tournament schedule (date+time combos)
 function getTournamentSlots() {
@@ -1489,7 +1570,7 @@ window.submitCambio = async function() {
   const refVal = document.getElementById('cambio-ref').value.trim();
   if (!dateVal) { errEl.textContent = '⚠ Aukeratu data berria'; return; }
   if (!timeVal) { errEl.textContent = '⚠ Aukeratu ordua'; return; }
-  if (!refVal) { errEl.textContent = '⚠ Idatzi epailearen izena'; return; }
+  // Epailea aukerakoa da (ez da derrigorrezkoa)
 
   // Check date limit
   const limit = getDateLimit(currentCambioMatch.j);
@@ -1612,19 +1693,47 @@ function getEffectiveMatchInfo(matchKey, originalDate, originalTime, originalRef
   return { date: originalDate, time: originalTime, ref: originalRef, changed: false };
 }
 
-// Get freed slots (original dates of approved cambios)
+// Get freed slots (original dates of approved cambios + abandoned pairs' unplayed matches)
 function getFreedSlots() {
-  // Only regular cambios (not reservas, not fromReserva auto-created)
-  // A freed slot = original date of an approved regular cambio
-  const regularApproved = Object.entries(cambios)
-    .filter(([id,c]) => c.status==='aprobado' && !c.isReserva && !c.fromReserva);
-  return regularApproved.map(([id,c]) => ({
-    id,
-    date: c.originalDate,
-    time: c.originalTime,
-    fromMatch: `${c.matchA} vs ${c.matchB}`,
-    jornada: c.jornada
-  }));
+  const slots = [];
+  const seen = new Set();
+  // 1. Regular cambios (not reservas, not fromReserva auto-created)
+  //    A freed slot = original date of an approved regular cambio
+  Object.entries(cambios)
+    .filter(([id,c]) => c.status==='aprobado' && !c.isReserva && !c.fromReserva)
+    .forEach(([id,c]) => {
+      const k = `${c.originalDate}|${c.originalTime}`;
+      if (seen.has(k)) return; seen.add(k);
+      slots.push({
+        id,
+        date: c.originalDate,
+        time: c.originalTime,
+        fromMatch: `${c.matchA} vs ${c.matchB}`,
+        jornada: c.jornada
+      });
+    });
+  // 2. Abandoned pairs: their unplayed matches free up that day/time as a hueko
+  const abPairs = Object.values(abandonos).map(a => a.pair);
+  if (abPairs.length) {
+    SCHEDULE.forEach(m => {
+      if (!(abPairs.includes(m.a) || abPairs.includes(m.b))) return;
+      if (results[MATCH_KEY(m)]) return; // played match → annulled, not freed
+      const eff = getEffectiveMatchInfo(MATCH_KEY(m), m.date, m.time, m.ref, m.a, m.b, m.j);
+      const dp = eff.date.split('/'); // dd/mm or dd/mm/yyyy
+      const ddmm = `${dp[0]}/${dp[1]}`;
+      const k = `${ddmm}|${eff.time}`;
+      if (seen.has(k)) return; seen.add(k);
+      slots.push({
+        id: `abandon_${MATCH_KEY(m)}`,
+        date: ddmm,
+        time: eff.time,
+        fromMatch: `${m.a} vs ${m.b}`,
+        jornada: m.j,
+        fromAbandon: true
+      });
+    });
+  }
+  return slots;
 }
 
 function renderDatak() {
@@ -1637,17 +1746,7 @@ function renderDatak() {
     return slotDate >= today;
   });
 
-  // Also show pending reservations
-  const pending = Object.entries(cambios)
-    .filter(([id,c]) => c.status==='pendiente' && c.isReserva)
-    .map(([id,c]) => ({id,...c}));
-
-  if (freed.length === 0) {
-    cont.innerHTML = '<div class="empty-state">Ez dago data librerik oraindik</div>';
-    return;
-  }
-
-  cont.innerHTML = freed.map(slot => {
+  const cards = freed.map(slot => {
     // Check if already reserved
     const reserved = Object.values(cambios).find(c =>
       c.isReserva && c.slotDate===slot.date && c.slotTime===slot.time && c.status!=='rechazado'
@@ -1660,12 +1759,19 @@ function renderDatak() {
           ${reserved.jornada}. jardunaldia · ${reserved.matchA} vs ${reserved.matchB}
         </div>`
       : `<button class="btn-apuntar" style="margin-top:10px;" onclick="openReservaModal('${slot.date}','${slot.time}','${slot.id}')">+ ERRESERBATU</button>`;
+    const reasonInfo = slot.fromAbandon
+      ? `Libre (abandonatua): ${slot.fromMatch} (${slot.jornada}. jard.)`
+      : `Askatu duena: ${slot.fromMatch} (${slot.jornada}. jard.)`;
     return `<div class="data-libre-card">
       <div class="data-libre-date">${slot.date} · ${slot.time}</div>
-      <div class="data-libre-info">Askatu duena: ${slot.fromMatch} (${slot.jornada}. jard.)</div>
+      <div class="data-libre-info">${reasonInfo}</div>
       ${statusHtml}
     </div>`;
   }).join('');
+
+  cont.innerHTML = cards.trim()
+    ? cards
+    : '<div class="empty-state">Ez dago data librerik oraindik</div>';
 }
 
 function renderCambiosLog() {
@@ -1703,6 +1809,7 @@ function renderCambiosLog() {
 // Reserva modal
 window.openReservaModal = function(date, time, slotId) {
   currentReservaSlotId = slotId;
+  currentReservaSlotInfo = { date, time };
   document.getElementById('reserva-slot-label').textContent = `${date} · ${time}`;
   document.getElementById('reserva-error').textContent = '';
   // Populate jornadas
@@ -1720,6 +1827,7 @@ window.openReservaModal = function(date, time, slotId) {
 window.closeReservaModal = function() {
   document.getElementById('reserva-modal-overlay').classList.remove('open');
   currentReservaSlotId = null;
+  currentReservaSlotInfo = null;
 };
 
 window.updateReservaMatches = function() {
@@ -1727,8 +1835,8 @@ window.updateReservaMatches = function() {
   const sel = document.getElementById('reserva-match');
   sel.innerHTML = '<option value="">— Aukeratu partida —</option>';
   if (!j) return;
-  // Show unplayed matches for this jornada
-  SCHEDULE.filter(m => m.j===j && !results[MATCH_KEY(m)]).forEach(m => {
+  // Show unplayed matches for this jornada (skip abandoned pairs' matches)
+  SCHEDULE.filter(m => m.j===j && !results[MATCH_KEY(m)] && !isAbandoned(m.a) && !isAbandoned(m.b)).forEach(m => {
     const opt = document.createElement('option');
     opt.value = MATCH_KEY(m);
     opt.textContent = `${m.a} vs ${m.b}`;
@@ -1742,20 +1850,20 @@ window.submitReserva = async function() {
   errEl.textContent = '';
   if (!matchKey) { errEl.textContent = '⚠ Aukeratu partida bat'; return; }
 
-  const slot = cambios[currentReservaSlotId];
+  const slot = currentReservaSlotInfo;
   if (!slot) { errEl.textContent = '⚠ Errorea'; return; }
 
   const match = SCHEDULE.find(m => MATCH_KEY(m)===matchKey);
   // Find the referee of the original match at that slot
-  const slotOriginalMatch = SCHEDULE.find(m => m.date===slot.originalDate && m.time===slot.originalTime);
+  const slotOriginalMatch = SCHEDULE.find(m => m.date===slot.date && m.time===slot.time);
   const slotRef = slotOriginalMatch ? slotOriginalMatch.ref : '';
   const reservaId = `reserva_${matchKey}_${Date.now()}`;
   try {
     await fbSet('cambios', reservaId, {
       isReserva: true,
       slotId: currentReservaSlotId,
-      slotDate: slot.originalDate,
-      slotTime: slot.originalTime,
+      slotDate: slot.date,
+      slotTime: slot.time,
       slotRef: slotRef,
       matchKey,
       matchA: match.a,
@@ -1797,6 +1905,61 @@ window.adminSaveCambioEdit = async function() {
     adminEditCambioId = null;
     showToast('Gordeta ✓');
   } catch(e) { showToast('Errorea: '+e.message, true); }
+};
+
+// ===================== ABANDONO (bikote batek uztea) =====================
+function renderAbandonAdmin() {
+  const sel = document.getElementById('abandon-sel');
+  if (sel) {
+    sel.innerHTML = '<option value="">— Aukeratu bikotea —</option>';
+    ['A','B'].forEach(g => {
+      const og = document.createElement('optgroup');
+      og.label = `${g} Taldea`;
+      GROUPS[g].forEach(p => {
+        if (isAbandoned(p)) return;
+        const o = document.createElement('option');
+        o.value = p; o.textContent = p;
+        og.appendChild(o);
+      });
+      if (og.children.length) sel.appendChild(og);
+    });
+  }
+  const log = document.getElementById('abandon-log');
+  if (log) {
+    const ab = Object.values(abandonos);
+    log.innerHTML = ab.length
+      ? ab.map(a => `<div class="log-item">
+          <div class="log-match" style="text-decoration:line-through;color:var(--muted);">${a.pair}</div>
+          <button class="btn-aprobar" onclick='restoreAbandono(${JSON.stringify(a.pair)})'>BERRESKURATU</button>
+        </div>`).join('')
+      : '<div class="empty-state">Inork ez du abandonatu</div>';
+  }
+}
+
+window.marcarAbandono = async function() {
+  const pair = document.getElementById('abandon-sel').value;
+  if (!pair) { showToast('Aukeratu bikote bat', true); return; }
+  if (!confirm(`${pair} abandonatu duela markatu?\n\n• Jokatutako partida guztiak EZEZTATU egingo dira (emaitzak ezabatuko dira).\n• Jokatu gabeko partidak libratu egingo dira eta huekoak sortuko dira.\n• Sailkapenean marratuta agertuko da.\n\nEkintza hau atzera bota daiteke "BERRESKURATU" botoiarekin, baina ezabatutako emaitzak EZ dira berreskuratuko.`)) return;
+  try {
+    await fbSet('abandonos', ABANDON_ID(pair), { pair, createdAt: Date.now() });
+    // Annul all played matches involving this pair (delete their results)
+    for (const m of SCHEDULE) {
+      if (m.a === pair || m.b === pair) {
+        const k = MATCH_KEY(m);
+        if (results[k]) await fbDel('results', k);
+      }
+    }
+    document.getElementById('abandon-sel').value = '';
+    showToast(`${pair} abandonatu du ✓`);
+  } catch(e) { showToast('Errorea: ' + e.message, true); }
+};
+
+window.restoreAbandono = async function(pair) {
+  if (!confirm(`${pair} berreskuratu?\n\nKontuan izan ezeztatutako emaitzak EZ direla automatikoki berreskuratuko. Eskuz sartu beharko dira berriro.`)) return;
+  try {
+    await fbDel('abandonos', ABANDON_ID(pair));
+    showToast('Berreskuratuta ✓');
+  } catch(e) { showToast('Errorea: ' + e.message, true); }
 };
 
 // ===================== VISIT COUNTER =====================
