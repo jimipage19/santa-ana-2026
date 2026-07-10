@@ -136,6 +136,13 @@
   .btn-confirm { flex: 2; padding: 12px; background: var(--red); border: none; color: white; border-radius: 6px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 1px; font-weight: 600; }
   .btn-confirm:hover { background: var(--red-light); }
   .btn-confirm:disabled { background: #444; color: var(--muted); cursor: not-allowed; }
+  .modal-special-sep { display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 2px; }
+  .modal-special-sep::before, .modal-special-sep::after { content: ''; flex: 1; height: 1px; background: #333; }
+  .modal-special-btns { display: flex; gap: 10px; }
+  .btn-special { flex: 1; padding: 10px; background: transparent; border: 1px dashed #555; color: var(--muted); border-radius: 6px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 1px; }
+  .btn-special:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-special-pair { display: block; width: 100%; padding: 14px 12px; margin-bottom: 10px; background: #1a1a1a; border: 1px solid #444; color: var(--cream); border-radius: 8px; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; font-weight: 600; }
+  .btn-special-pair:hover { border-color: var(--gold); color: var(--gold); }
 
   .confirm-box { background: #0d1a10; border: 1px solid var(--green); border-radius: 10px; padding: 20px; margin-bottom: 20px; text-align: center; }
   .confirm-score { font-family: 'Bebas Neue', sans-serif; font-size: 40px; letter-spacing: 4px; color: var(--gold); }
@@ -473,6 +480,20 @@
         <button class="btn-cancel" onclick="closeModal()">UTZI</button>
         <button class="btn-confirm" onclick="validateAndConfirm()">HURRENGOA →</button>
       </div>
+      <div class="modal-special-sep">EDO</div>
+      <div class="modal-special-btns">
+        <button class="btn-special" onclick="openSpecialView('ez_aurkeztua')">🚫 EZ AURKEZTUA</button>
+        <button class="btn-special" onclick="openSpecialView('ez_jokatua')">⚖ EZ JOKATUA</button>
+      </div>
+    </div>
+    <div id="modal-special-view" style="display:none">
+      <div class="modal-title" id="special-title">—</div>
+      <div class="modal-sub" id="special-question">—</div>
+      <button class="btn-special-pair" id="special-pair-a" onclick="selectSpecialPair('a')">—</button>
+      <button class="btn-special-pair" id="special-pair-b" onclick="selectSpecialPair('b')">—</button>
+      <div class="modal-btns" style="margin-top:6px;">
+        <button class="btn-cancel" onclick="backToInput()">← ATZERA</button>
+      </div>
     </div>
     <div id="modal-confirm-view" style="display:none">
       <div class="modal-title">BERRETSI</div>
@@ -481,6 +502,7 @@
         <div class="confirm-teams" id="confirm-teams-text">—</div>
         <div class="confirm-score" id="confirm-score-text">— – —</div>
         <div class="confirm-winner" id="confirm-winner-text">—</div>
+        <div class="confirm-winner" id="confirm-special-note" style="color:#C9A84C;"></div>
       </div>
       <div class="modal-btns">
         <button class="btn-cancel" onclick="backToInput()">← ATZERA</button>
@@ -660,6 +682,8 @@ let knockoutResults = {};
 let abandonos = {};
 let selectedJornada = getCurrentJornada();
 let currentMatch = null;
+let specialMode = null;      // null | 'ez_aurkeztua' | 'ez_jokatua'
+let specialSelection = null; // 'a' | 'b' — ez_aurkeztua: nor ez den aurkeztu · ez_jokatua: nork irabazi duen
 let antolakuntzaUnlocked = false;
 
 // Jornada relevant to "now": the one with matches in the current week,
@@ -760,8 +784,11 @@ function computeStandings(group) {
       stats[m.a].p++; stats[m.b].p++;
       stats[m.a].tf+=sa; stats[m.a].tc+=sb;
       stats[m.b].tf+=sb; stats[m.b].tc+=sa;
-      if (sa>sb) { stats[m.a].w++; stats[m.a].pts+=2; stats[m.b].l++; stats[m.b].pts+=1; }
-      else       { stats[m.b].w++; stats[m.b].pts+=2; stats[m.a].l++; stats[m.a].pts+=1; }
+      // ez_jokatua: 0-0 gordetzen da, irabazlea 'winner' eremutik dator · ez_aurkeztua: galtzaileak 0 puntu
+      const winnerIsA = r.mode==='ez_jokatua' ? r.winner==='a' : sa>sb;
+      const loserPts = r.mode==='ez_aurkeztua' ? 0 : 1;
+      if (winnerIsA) { stats[m.a].w++; stats[m.a].pts+=2; stats[m.b].l++; stats[m.b].pts+=loserPts; }
+      else           { stats[m.b].w++; stats[m.b].pts+=2; stats[m.a].l++; stats[m.a].pts+=loserPts; }
     }
   });
 
@@ -784,8 +811,10 @@ function computeStandings(group) {
       const {sa,sb} = r;
       h[m.a].tf+=sa; h[m.a].tc+=sb;
       h[m.b].tf+=sb; h[m.b].tc+=sa;
-      if (sa>sb) { h[m.a].pts+=2; h[m.b].pts+=1; }
-      else       { h[m.b].pts+=2; h[m.a].pts+=1; }
+      const winnerIsA = r.mode==='ez_jokatua' ? r.winner==='a' : sa>sb;
+      const loserPts = r.mode==='ez_aurkeztua' ? 0 : 1;
+      if (winnerIsA) { h[m.a].pts+=2; h[m.b].pts+=loserPts; }
+      else           { h[m.b].pts+=2; h[m.a].pts+=loserPts; }
     });
     return h;
   }
@@ -1041,6 +1070,7 @@ window.openCalPopup = function(dateStr) {
         <div class="cal-popup-score">${jugado?`${res.sa}–${res.sb}`:'·–·'}</div>
         <div class="cal-popup-name right">${m.b}</div>
       </div>
+      ${jugado && res.mode ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;margin-top:4px;color:${res.mode==='ez_aurkeztua'?'#ff8a90':'#4CAF50'};">${res.mode==='ez_aurkeztua'?`🚫 EZ AURKEZTUA: ${res.winner==='a'?m.b:m.a}`:`⚖ EZ JOKATUA — Irabazlea: ${res.winner==='a'?m.a:m.b}`}</div>`:''}
       <div class="cal-popup-ref">EPAILEA: ${efectivo.ref || m.ref}</div>
       ${isChanged?`<div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#C9A84C;margin-top:6px;letter-spacing:1px;">🔄 DATA ALDATUA → ${efectivo.date} · ${efectivo.time}</div>`:''}
       ${isPending?'<div class="cambio-badge pendiente" style="margin-top:6px;display:block;">⏳ DATA ALDAKETA ESKATUA</div>':''}
@@ -1123,6 +1153,11 @@ function renderPartidos() {
       : '';
     const nameAStyle = abandonA?'text-decoration:line-through;opacity:0.6;':'';
     const nameBStyle = abandonB?'text-decoration:line-through;opacity:0.6;':'';
+    const specialBadge = (!hasAbandon && jugado && res.mode)
+      ? (res.mode==='ez_aurkeztua'
+        ? `<div class='cambio-badge' style='display:block;background:#1a0a0a;color:#ff8a90;border:1px solid #5a2020;'>🚫 EZ AURKEZTUA: ${res.winner==='a'?m.b:m.a}</div>`
+        : `<div class='cambio-badge' style='display:block;background:#0d1a10;color:#4CAF50;border:1px solid #1A7A3A;'>⚖ EZ JOKATUA — Irabazlea: ${res.winner==='a'?m.a:m.b}</div>`)
+      : '';
     return `<div class="partido-card ${cardClass}"${hasAbandon?' style="opacity:0.85;"':''}>
       <div class="partido-meta"><span>${m.group} TALDEA · ${efectivo.date}${efectivo.changed?' 🔄':''} · ${efectivo.time}</span><span>${hasAbandon?'BERTAN BEHERA':jugado?'✓ JOKATUA':'PENDIENTE'}</span></div>
       <div class="partido-ref">EPAILEA: ${efectivo.ref || m.ref}${efectivo.changed && efectivo.ref!==m.ref?' 🔄':''}</div>
@@ -1131,6 +1166,7 @@ function renderPartidos() {
         <div class="resultado-display">${(!hasAbandon && jugado)?`${res.sa}–${res.sb}`:'·–·'}</div>
         <div class="equipo-name right" style="${nameBStyle}">${m.b}</div>
       </div>
+      ${specialBadge}
       ${abandonHtml}
       ${hasAbandon ? '' : cambioHtml}
       ${!hasAbandon && !jugado && antolakuntzaUnlocked?`<button class="btn-apuntar" onclick='openModal(${JSON.stringify(m)})'>+ EMAITZA SARTU</button>`:''}
@@ -1150,7 +1186,9 @@ window.openModal = m => {
   document.getElementById('modal-score-a').value = '';
   document.getElementById('modal-score-b').value = '';
   document.getElementById('modal-error').textContent = '';
+  specialMode = null; specialSelection = null;
   document.getElementById('modal-input-view').style.display = 'block';
+  document.getElementById('modal-special-view').style.display = 'none';
   document.getElementById('modal-confirm-view').style.display = 'none';
   document.getElementById('modal-overlay').classList.add('open');
   setTimeout(() => document.getElementById('modal-score-a').focus(), 100);
@@ -1171,30 +1209,82 @@ window.validateAndConfirm = () => {
   if (sa===sb)                 { err.textContent='⚠ Ezin berdinketa — batek 25 behar du'; return; }
   if (sa!==25&&sb!==25)        { err.textContent='⚠ Batek 25 tanto egin behar ditu'; return; }
   err.textContent = '';
+  specialMode = null; specialSelection = null;
   const winner = sa>sb ? currentMatch.a : currentMatch.b;
   document.getElementById('confirm-teams-text').textContent = `${currentMatch.a}  vs  ${currentMatch.b}`;
   document.getElementById('confirm-score-text').textContent = `${sa} – ${sb}`;
   document.getElementById('confirm-winner-text').textContent = `✓ IRABAZLEA: ${winner}`;
+  document.getElementById('confirm-special-note').textContent = '';
   document.getElementById('modal-input-view').style.display = 'none';
   document.getElementById('modal-confirm-view').style.display = 'block';
 };
 
 window.backToInput = () => {
+  specialMode = null; specialSelection = null;
   document.getElementById('modal-input-view').style.display = 'block';
+  document.getElementById('modal-special-view').style.display = 'none';
   document.getElementById('modal-confirm-view').style.display = 'none';
+};
+
+window.openSpecialView = mode => {
+  if (!currentMatch) return;
+  specialMode = mode;
+  document.getElementById('special-title').textContent = mode==='ez_aurkeztua' ? 'EZ AURKEZTUA' : 'EZ JOKATUA';
+  document.getElementById('special-question').textContent = mode==='ez_aurkeztua' ? 'NOR EZ DA AURKEZTU?' : 'NORK IRABAZI DU?';
+  document.getElementById('special-pair-a').textContent = currentMatch.a;
+  document.getElementById('special-pair-b').textContent = currentMatch.b;
+  document.getElementById('modal-input-view').style.display = 'none';
+  document.getElementById('modal-special-view').style.display = 'block';
+};
+
+window.selectSpecialPair = side => {
+  if (!currentMatch) return;
+  specialSelection = side;
+  const m = currentMatch;
+  let sa, sb, winner, note;
+  if (specialMode === 'ez_aurkeztua') {
+    sa = side==='a' ? 0 : 25;
+    sb = side==='a' ? 25 : 0;
+    winner = side==='a' ? m.b : m.a;
+    note = `🚫 EZ AURKEZTUA: ${side==='a'?m.a:m.b} — 0 puntu`;
+  } else {
+    sa = 0; sb = 0;
+    winner = side==='a' ? m.a : m.b;
+    note = '⚖ EZ JOKATUA — irabazleak 2 puntu · galtzaileak 1 puntu';
+  }
+  document.getElementById('confirm-teams-text').textContent = `${m.a}  vs  ${m.b}`;
+  document.getElementById('confirm-score-text').textContent = `${sa} – ${sb}`;
+  document.getElementById('confirm-winner-text').textContent = `✓ IRABAZLEA: ${winner}`;
+  document.getElementById('confirm-special-note').textContent = note;
+  document.getElementById('modal-special-view').style.display = 'none';
+  document.getElementById('modal-confirm-view').style.display = 'block';
 };
 
 window.saveResult = async () => {
   if (!currentMatch) return;
-  const sa = parseInt(document.getElementById('modal-score-a').value);
-  const sb = parseInt(document.getElementById('modal-score-b').value);
+  let sa, sb;
+  const extra = {};
+  if (specialMode === 'ez_aurkeztua' && specialSelection) {
+    sa = specialSelection==='a' ? 0 : 25;
+    sb = specialSelection==='a' ? 25 : 0;
+    extra.mode = 'ez_aurkeztua';
+    extra.winner = specialSelection==='a' ? 'b' : 'a';
+  } else if (specialMode === 'ez_jokatua' && specialSelection) {
+    sa = 0; sb = 0;
+    extra.mode = 'ez_jokatua';
+    extra.winner = specialSelection;
+  } else {
+    sa = parseInt(document.getElementById('modal-score-a').value);
+    sb = parseInt(document.getElementById('modal-score-b').value);
+  }
   const btn = document.getElementById('btn-save-final');
   btn.disabled=true; btn.textContent='GORDETZEN...';
   try {
     await fbSet('results', MATCH_KEY(currentMatch), {
       sa, sb,
       matchA: currentMatch.a, matchB: currentMatch.b,
-      jornada: currentMatch.j, date: currentMatch.date
+      jornada: currentMatch.j, date: currentMatch.date,
+      ...extra
     });
     closeModal();
     showToast('Emaitza gordeta ✓');
@@ -1362,7 +1452,7 @@ function populateAdminMatchSel() {
       const r=results[MATCH_KEY(m)];
       const opt=document.createElement('option');
       opt.value=MATCH_KEY(m);
-      opt.textContent=`${m.a} vs ${m.b} — ${r.sa}–${r.sb}`;
+      opt.textContent=`${m.a} vs ${m.b} — ${r.sa}–${r.sb}${r.mode==='ez_aurkeztua'?' (ez aurkeztua)':r.mode==='ez_jokatua'?' (ez jokatua)':''}`;
       og.appendChild(opt);
     });
     sel.appendChild(og);
@@ -1437,7 +1527,8 @@ function renderAdminLog() {
     const key=MATCH_KEY(m);
     if (results[key]) {
       const r=results[key];
-      items.push({label:`J${m.j} · ${m.a} vs ${m.b}`,score:`${r.sa}–${r.sb}`,key,type:'liga'});
+      const tag = r.mode==='ez_aurkeztua'?' · EZ AURKEZTUA':r.mode==='ez_jokatua'?' · EZ JOKATUA':'';
+      items.push({label:`J${m.j} · ${m.a} vs ${m.b}`,score:`${r.sa}–${r.sb}${tag}`,key,type:'liga'});
     }
   });
   [{id:'qf1',l:'1. FL'},{id:'qf2',l:'2. FL'},{id:'qf3',l:'3. FL'},{id:'qf4',l:'4. FL'},{id:'sf1',l:'1. Finalerdia'},{id:'sf2',l:'2. Finalerdia'},{id:'final',l:'Finala'}].forEach(k => {
