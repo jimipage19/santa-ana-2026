@@ -391,7 +391,7 @@
       <div class="admin-panel">
         <h3>Emaitza aldatu</h3>
         <div class="form-row">
-          <label>PARTIDA (jokatu direnak soilik)</label>
+          <label>PARTIDA (liga: jokatuak · azken fasea: denak)</label>
           <select id="admin-match-sel" onchange="fillAdminScore()">
             <option value="">— Aukeratu partida —</option>
           </select>
@@ -480,8 +480,8 @@
         <button class="btn-cancel" onclick="closeModal()">UTZI</button>
         <button class="btn-confirm" onclick="validateAndConfirm()">HURRENGOA →</button>
       </div>
-      <div class="modal-special-sep">EDO</div>
-      <div class="modal-special-btns">
+      <div class="modal-special-sep" id="modal-special-sep">EDO</div>
+      <div class="modal-special-btns" id="modal-special-btns">
         <button class="btn-special" onclick="openSpecialView('ez_aurkeztua')">🚫 EZ AURKEZTUA</button>
         <button class="btn-special" onclick="openSpecialView('ez_jokatua')">⚖ EZ JOKATUA</button>
       </div>
@@ -676,6 +676,30 @@ const ANTOLAKUNTZA_PIN = "1990";
 const MATCH_KEY = m => `j${m.j}_${m.group}_${m.a}_${m.b}`.replace(/[\s\/]/g,'_');
 const ABANDON_ID = pair => pair.replace(/[\s\/]/g,'_');
 
+// Azken faseko egutegia. `id` = doc id in the `knockout` collection (do not change).
+// srcA/srcB: 'A1'..'B4' (liga seed) or a previous knockout id ('qf1'..'sf2').
+// QF dates/times confirmed by antolakuntza 2026-07-14; SF times follow the
+// tournament convention; the final's time is not fixed yet → empty, hidden in the UI.
+// Array order = bracket order (FL1..FL4); lists sort chronologically with KO_CHRONO.
+const KO_SCHEDULE = [
+  {id:'qf1',   round:'qf',    label:'FL1',    roundName:'1. Final-laurdena', date:'16/07', dateLabel:'Uzt. 16', time:'Jarraian', srcA:'A1',  srcB:'B4',  seedA:'A1',  seedB:'B4'},
+  {id:'qf2',   round:'qf',    label:'FL2',    roundName:'2. Final-laurdena', date:'14/07', dateLabel:'Uzt. 14', time:'19:00',    srcA:'A2',  srcB:'B3',  seedA:'A2',  seedB:'B3'},
+  {id:'qf3',   round:'qf',    label:'FL3',    roundName:'3. Final-laurdena', date:'16/07', dateLabel:'Uzt. 16', time:'19:30',    srcA:'B1',  srcB:'A4',  seedA:'B1',  seedB:'A4'},
+  {id:'qf4',   round:'qf',    label:'FL4',    roundName:'4. Final-laurdena', date:'17/07', dateLabel:'Uzt. 17', time:'19:00',    srcA:'B2',  srcB:'A3',  seedA:'B2',  seedB:'A3'},
+  {id:'sf1',   round:'sf',    label:'SF1',    roundName:'1. Finalerdia',     date:'21/07', dateLabel:'Uzt. 21', time:'19:00',    srcA:'qf1', srcB:'qf4', seedA:'FL1', seedB:'FL4', phA:'FL1 irabazlea', phB:'FL4 irabazlea'},
+  {id:'sf2',   round:'sf',    label:'SF2',    roundName:'2. Finalerdia',     date:'21/07', dateLabel:'Uzt. 21', time:'Jarraian', srcA:'qf3', srcB:'qf2', seedA:'FL3', seedB:'FL2', phA:'FL3 irabazlea', phB:'FL2 irabazlea'},
+  {id:'final', round:'final', label:'FINALA', roundName:'Finala',            date:'26/07', dateLabel:'Uzt. 26', time:'',         srcA:'sf1', srcB:'sf2', seedA:'SF1', seedB:'SF2', phA:'SF1 irabazlea', phB:'SF2 irabazlea'},
+];
+// Chronological comparator for knockout matches ('Jarraian' goes after the
+// day's timed match; the final's empty time is the only match of its day)
+const KO_CHRONO = (x,y) => {
+  const key = k => {
+    const [d,mo] = k.date.split('/');
+    return `${mo}${d}_${k.time==='Jarraian' ? '99:99' : (k.time || '00:00')}`;
+  };
+  return key(x).localeCompare(key(y));
+};
+
 // ===================== STATE =====================
 let results = {};
 let knockoutResults = {};
@@ -717,8 +741,8 @@ function getCurrentJornada() {
   for (const j of js) {
     if (ranges[j].min >= today) return j;
   }
-  // 4. Tournament finished → last jornada
-  return js.length ? js[js.length-1] : 1;
+  // 4. Liga finished → azken fasea (finalak tab)
+  return 'F';
 }
 
 // True if a pair has abandoned the tournament
@@ -742,6 +766,7 @@ function initFirebase() {
     knockoutResults = {};
     snap.forEach(d => { knockoutResults[d.id] = d.data(); });
     renderBracket();
+    renderPartidos(); // finalak tab shows knockout matches
     if (antolakuntzaUnlocked) renderAdminLog();
   });
 
@@ -937,6 +962,13 @@ function getMatchDates() {
     if (!map[dateKey]) map[dateKey] = [];
     map[dateKey].push(m);
   });
+  // Azken faseko partidak (fixed dates)
+  KO_SCHEDULE.forEach(k => {
+    const [d,mo] = k.date.split('/');
+    const dateKey = `2026-${mo}-${d}`;
+    if (!map[dateKey]) map[dateKey] = [];
+    map[dateKey].push(k);
+  });
   return map;
 }
 
@@ -1032,7 +1064,10 @@ window.openCalPopup = function(dateStr) {
     return m.date === dateFormatted;
   });
 
-  if (!dayMatches.length) return;
+  // Azken faseko partidak for this date
+  const koDay = getKnockoutMatches().filter(k => k.date === dateFormatted).sort(KO_CHRONO);
+
+  if (!dayMatches.length && !koDay.length) return;
 
   // Group by jornada
   const byJornada = {};
@@ -1041,7 +1076,10 @@ window.openCalPopup = function(dateStr) {
     byJornada[m.j].push(m);
   });
 
-  const jornadaLabel = Object.keys(byJornada).map(j => `${j}. JARDUNALDIA`).join(' · ');
+  const jornadaLabel = [
+    ...Object.keys(byJornada).map(j => `${j}. JARDUNALDIA`),
+    ...(koDay.length ? ['AZKEN FASEA'] : [])
+  ].join(' · ');
 
   document.getElementById('cal-popup-title').textContent = `${dayName.toUpperCase()}, ${parseInt(d)} ${months[parseInt(mo)-1].toUpperCase()}`;
   document.getElementById('cal-popup-sub').textContent = jornadaLabel;
@@ -1075,6 +1113,21 @@ window.openCalPopup = function(dateStr) {
       ${isChanged?`<div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#C9A84C;margin-top:6px;letter-spacing:1px;">🔄 DATA ALDATUA → ${efectivo.date} · ${efectivo.time}</div>`:''}
       ${isPending?'<div class="cambio-badge pendiente" style="margin-top:6px;display:block;">⏳ DATA ALDAKETA ESKATUA</div>':''}
     </div>`;
+  }).join('') + koDay.map(k => {
+    const res = k.res, jugado = !!res;
+    const winner = (jugado && k.aKnown && k.bKnown) ? (res.sa>res.sb ? k.a : k.b) : null;
+    return `<div class="cal-popup-match" style="border-left-color:${jugado?'var(--green)':'#C9A84C'}">
+      <div class="cal-popup-meta">
+        <span>${k.roundName.toUpperCase()}${k.time?` · ${k.time}`:''}</span>
+        <span>${jugado?'✓ JOKATUA':'PENDIENTE'}</span>
+      </div>
+      <div class="cal-popup-equipos">
+        <div class="cal-popup-name" ${k.aKnown?'':'style="color:var(--muted);font-style:italic;"'}>${k.a}</div>
+        <div class="cal-popup-score">${jugado?`${res.sa}–${res.sb}`:'·–·'}</div>
+        <div class="cal-popup-name right" ${k.bKnown?'':'style="color:var(--muted);font-style:italic;"'}>${k.b}</div>
+      </div>
+      ${winner?`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;margin-top:4px;color:#4CAF50;">✓ IRABAZLEA: ${winner}</div>`:''}
+    </div>`;
   }).join('');
 
   document.getElementById('cal-popup-overlay').classList.add('open');
@@ -1084,13 +1137,20 @@ window.openCalPopup = function(dateStr) {
 function initJornadaBtns() {
   const cont = document.getElementById('jornada-btns');
   cont.innerHTML = '';
-  for (let j=1;j<=7;j++) {
+  const mkBtn = (value, text) => {
     const btn = document.createElement('button');
-    btn.className = 'jornada-btn'+(j===selectedJornada?' active':'');
-    btn.textContent = j;
-    btn.onclick = () => { selectedJornada=j; selectedCalDate=null; initJornadaBtns(); renderCalendar(); renderPartidos(); };
+    btn.className = 'jornada-btn'+(value===selectedJornada?' active':'');
+    btn.textContent = text;
+    btn.onclick = () => { selectedJornada=value; selectedCalDate=null; initJornadaBtns(); renderCalendar(); renderPartidos(); };
     cont.appendChild(btn);
-  }
+    return btn;
+  };
+  for (let j=1;j<=7;j++) mkBtn(j, j);
+  // Azken fasea (finalak)
+  const fbtn = mkBtn('F', 'FINALAK');
+  fbtn.title = 'Azken fasea';
+  if (selectedJornada!=='F') { fbtn.style.borderColor='#7a6020'; fbtn.style.color='#C9A84C'; }
+  else { fbtn.style.background='#C9A84C'; fbtn.style.borderColor='#C9A84C'; fbtn.style.color='#141414'; }
 }
 
 function initPairSelector() {
@@ -1103,9 +1163,35 @@ function initPairSelector() {
 
 function renderPartidos() {
   const pf = document.getElementById('pair-filter').value;
+  const cont = document.getElementById('partidos-list');
+
+  // Azken fasea (finalak tab)
+  if (selectedJornada === 'F') {
+    let kos = getKnockoutMatches().sort(KO_CHRONO);
+    if (pf) kos = kos.filter(k => k.a===pf || k.b===pf);
+    if (!kos.length) { cont.innerHTML='<div class="empty-state">Partidarik ez</div>'; return; }
+    cont.innerHTML = kos.map(k => {
+      const res = k.res, jugado = !!res;
+      const tbd = !k.aKnown || !k.bKnown;
+      const winner = jugado ? (res.sa>res.sb ? k.a : k.b) : null;
+      const nameAStyle = k.aKnown ? '' : 'color:var(--muted);font-style:italic;';
+      const nameBStyle = k.bKnown ? '' : 'color:var(--muted);font-style:italic;';
+      return `<div class="partido-card ${jugado?'jugado':'pending'}">
+        <div class="partido-meta"><span>${k.roundName.toUpperCase()} · ${k.date}${k.time?` · ${k.time}`:''}</span><span>${jugado?'✓ JOKATUA':'PENDIENTE'}</span></div>
+        <div class="partido-equipos">
+          <div class="equipo-name" style="${nameAStyle}">${k.a}</div>
+          <div class="resultado-display">${jugado?`${res.sa}–${res.sb}`:'·–·'}</div>
+          <div class="equipo-name right" style="${nameBStyle}">${k.b}</div>
+        </div>
+        ${winner && !tbd?`<div class='cambio-badge' style='display:block;background:#0d1a10;color:#4CAF50;border:1px solid #1A7A3A;'>✓ IRABAZLEA: ${winner}</div>`:''}
+        ${!jugado && !tbd && antolakuntzaUnlocked?`<button class="btn-apuntar" onclick='openKoModal("${k.id}")'>+ EMAITZA SARTU</button>`:''}
+      </div>`;
+    }).join('');
+    return;
+  }
+
   let matches = SCHEDULE.filter(m => m.j===selectedJornada);
   if (pf) matches = matches.filter(m => m.a===pf||m.b===pf);
-  const cont = document.getElementById('partidos-list');
   if (!matches.length) { cont.innerHTML='<div class="empty-state">Partidarik ez jardunaldi honetan</div>'; return; }
   cont.innerHTML = matches.map(m => {
     const key=MATCH_KEY(m), res=results[key], jugado=!!res;
@@ -1176,13 +1262,26 @@ function renderPartidos() {
 }
 
 // ===================== MODAL =====================
+// Azken faseko emaitza sartu: teams are re-derived at click time so they
+// can't go stale between render and click.
+window.openKoModal = id => {
+  const k = getKnockoutMatches().find(x => x.id===id);
+  if (!k || !k.aKnown || !k.bKnown || k.res) return;
+  openModal({ko:true, id:k.id, roundName:k.roundName, date:k.date, a:k.a, b:k.b});
+};
+
 window.openModal = m => {
   currentMatch = m;
   document.getElementById('modal-pair-a').textContent = m.a;
   document.getElementById('modal-pair-b').textContent = m.b;
   document.getElementById('modal-label-a').textContent = m.a.split(' / ')[0].toUpperCase();
   document.getElementById('modal-label-b').textContent = m.b.split(' / ')[0].toUpperCase();
-  document.getElementById('modal-jornada-label').textContent = `${m.j}. JARDUNALDIA · ${m.date}`;
+  document.getElementById('modal-jornada-label').textContent = m.ko
+    ? `${m.roundName.toUpperCase()} · ${m.date}`
+    : `${m.j}. JARDUNALDIA · ${m.date}`;
+  // Emaitza bereziak (ez aurkeztua / ez jokatua) ligaxkan bakarrik
+  document.getElementById('modal-special-sep').style.display = m.ko ? 'none' : '';
+  document.getElementById('modal-special-btns').style.display = m.ko ? 'none' : '';
   document.getElementById('modal-score-a').value = '';
   document.getElementById('modal-score-b').value = '';
   document.getElementById('modal-error').textContent = '';
@@ -1280,12 +1379,17 @@ window.saveResult = async () => {
   const btn = document.getElementById('btn-save-final');
   btn.disabled=true; btn.textContent='GORDETZEN...';
   try {
-    await fbSet('results', MATCH_KEY(currentMatch), {
-      sa, sb,
-      matchA: currentMatch.a, matchB: currentMatch.b,
-      jornada: currentMatch.j, date: currentMatch.date,
-      ...extra
-    });
+    if (currentMatch.ko) {
+      // Knockout doc format is {sa,sb} — same shape the bracket/admin already read
+      await fbSet('knockout', currentMatch.id, {sa, sb});
+    } else {
+      await fbSet('results', MATCH_KEY(currentMatch), {
+        sa, sb,
+        matchA: currentMatch.a, matchB: currentMatch.b,
+        jornada: currentMatch.j, date: currentMatch.date,
+        ...extra
+      });
+    }
     closeModal();
     showToast('Emaitza gordeta ✓');
   } catch(e) {
@@ -1302,58 +1406,50 @@ function getTopPairs() {
   };
 }
 
-function renderBracket() {
+// KO_SCHEDULE + standings + knockoutResults → the 7 knockout matches with
+// resolved team names. aKnown/bKnown=false means the team is still a
+// placeholder ('FL1 irabazlea') because the previous round isn't decided.
+// Single source of truth for bracket, Partidak, calendar and admin.
+function getKnockoutMatches() {
   const {topA,topB} = getTopPairs();
-  const a1=topA[0]||'?', a2=topA[1]||'?', a3=topA[2]||'?', a4=topA[3]||'?';
-  const b1=topB[0]||'?', b2=topB[1]||'?', b3=topB[2]||'?', b4=topB[3]||'?';
+  const seeds = {A1:topA[0],A2:topA[1],A3:topA[2],A4:topA[3],B1:topB[0],B2:topB[1],B3:topB[2],B4:topB[3]};
+  const byId = {};
+  return KO_SCHEDULE.map(k => {
+    const resolve = (src, ph) => {
+      if (seeds[src]) return {name: seeds[src], known: true};
+      const prev = byId[src], r = knockoutResults[src];
+      if (prev && r && prev.aKnown && prev.bKnown) return {name: r.sa>r.sb ? prev.a : prev.b, known: true};
+      return {name: ph || '?', known: false};
+    };
+    const A = resolve(k.srcA, k.phA), B = resolve(k.srcB, k.phB);
+    const built = {...k, a:A.name, b:B.name, aKnown:A.known, bKnown:B.known, res:knockoutResults[k.id]};
+    byId[k.id] = built;
+    return built;
+  });
+}
 
-  const qf1=knockoutResults['qf1'], qf2=knockoutResults['qf2'];
-  const qf3=knockoutResults['qf3'], qf4=knockoutResults['qf4'];
-  const sf1=knockoutResults['sf1'], sf2=knockoutResults['sf2'];
-  const fin=knockoutResults['final'];
-
-  // QF winners
-  const qf1w = qf1?(qf1.sa>qf1.sb?a1:b4):'?';
-  const qf2w = qf2?(qf2.sa>qf2.sb?a2:b3):'?';
-  const qf3w = qf3?(qf3.sa>qf3.sb?b1:a4):'?';
-  const qf4w = qf4?(qf4.sa>qf4.sb?b2:a3):'?';
-
-  // SF: SF1 = FL1irab vs FL4irab, SF2 = FL3irab vs FL2irab
-  const sf1a = qf1w!=='?'?qf1w:'FL1 irabazlea';
-  const sf1b = qf4w!=='?'?qf4w:'FL4 irabazlea';
-  const sf2a = qf3w!=='?'?qf3w:'FL3 irabazlea';
-  const sf2b = qf2w!=='?'?qf2w:'FL2 irabazlea';
-
-  const sf1w = sf1?(sf1.sa>sf1.sb?sf1a:sf1b):'?';
-  const sf2w = sf2?(sf2.sa>sf2.sb?sf2a:sf2b):'?';
-
-  const fteamA = sf1w!=='?'?sf1w:'SF1 irabazlea';
-  const fteamB = sf2w!=='?'?sf2w:'SF2 irabazlea';
-
-  const champion = fin?(fin.sa>fin.sb?sf1w:sf2w):null;
-  const done = SCHEDULE.filter(m=>results[MATCH_KEY(m)]).length;
+function renderBracket() {
+  const ko = getKnockoutMatches();
+  const finM = ko.find(k=>k.id==='final');
+  const fin = finM.res;
+  const champion = (fin && finM.aKnown && finM.bKnown) ? (fin.sa>fin.sb?finM.a:finM.b) : null;
+  // Abandoned pairs' matches are annulled — don't count them as pending
+  const ligaMatches = SCHEDULE.filter(m=>!isAbandoned(m.a)&&!isAbandoned(m.b));
+  const done = ligaMatches.filter(m=>results[MATCH_KEY(m)]).length;
+  const roundBlock = round => ko.filter(k=>k.round===round)
+    .map(k=>bMatch(k.a,k.b,k.res,k.label,k.dateLabel,k.round,k.seedA,k.seedB)).join('');
 
   document.getElementById('bracket-content').innerHTML = `
-    ${done<SCHEDULE.length?`<div style="background:#1a1200;border:1px solid #5a4000;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#c9a84c;letter-spacing:1px;">⏳ Ligaxka ez da bukatu oraindik — ${done}/${SCHEDULE.length} partida jokatu dira</div>`:''}
+    ${done<ligaMatches.length?`<div style="background:#1a1200;border:1px solid #5a4000;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#c9a84c;letter-spacing:1px;">⏳ Ligaxka ez da bukatu oraindik — ${done}/${ligaMatches.length} partida jokatu dira</div>`:''}
 
     <div class="bracket-round-label" style="color:#5a9fd4;border-bottom-color:#1e3a6a;">FINAL-LAURDENAK</div>
-    <div class="bracket-matches-col">
-      ${bMatch(a1,b4,qf1,'FL1','Uzt. 14','qf','A1','B4')}
-      ${bMatch(a2,b3,qf2,'FL2','Uzt. 14','qf','A2','B3')}
-      ${bMatch(b1,a4,qf3,'FL3','Uzt. 16','qf','B1','A4')}
-      ${bMatch(b2,a3,qf4,'FL4','Uzt. 16','qf','B2','A3')}
-    </div>
+    <div class="bracket-matches-col">${roundBlock('qf')}</div>
 
     <div class="bracket-round-label" style="color:#9a6ad4;border-bottom-color:#4a2a6a;">FINALERDIAK</div>
-    <div class="bracket-matches-col">
-      ${bMatch(sf1a,sf1b,sf1,'SF1','Uzt. 21','sf','FL1','FL4')}
-      ${bMatch(sf2a,sf2b,sf2,'SF2','Uzt. 21','sf','FL3','FL2')}
-    </div>
+    <div class="bracket-matches-col">${roundBlock('sf')}</div>
 
     <div class="bracket-round-label" style="color:#C9A84C;border-bottom-color:#7a6020;">FINALA</div>
-    <div class="bracket-matches-col">
-      ${bMatch(fteamA,fteamB,fin,'FINALA','Uzt. 26','final','SF1','SF2')}
-    </div>
+    <div class="bracket-matches-col">${roundBlock('final')}</div>
 
     ${champion?`<div class="champion-box">
       <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4CAF50;letter-spacing:3px;margin-bottom:10px;">🏆 TXAPELDUNA 2026</div>
@@ -1457,16 +1553,18 @@ function populateAdminMatchSel() {
     });
     sel.appendChild(og);
   }
-  const koPlayed = [{id:'qf1',label:'1. Final-laurdena'},{id:'qf2',label:'2. Final-laurdena'},{id:'qf3',label:'3. Final-laurdena'},{id:'qf4',label:'4. Final-laurdena'},{id:'sf1',label:'1. Finalerdia'},{id:'sf2',label:'2. Finalerdia'},{id:'final',label:'Finala'}]
-    .filter(k=>knockoutResults[k.id]);
-  if (koPlayed.length) {
+  // Azken fasea: also list unplayed matches (once both teams are known)
+  // so results can be entered from here too
+  const koMatches = getKnockoutMatches().filter(k => k.res || (k.aKnown && k.bKnown));
+  if (koMatches.length) {
     const og2=document.createElement('optgroup');
     og2.label='Azken Fasea';
-    koPlayed.forEach(k => {
-      const r=knockoutResults[k.id];
+    koMatches.forEach(k => {
+      const r=k.res;
       const opt=document.createElement('option');
       opt.value='ko_'+k.id;
-      opt.textContent=`${k.label} — ${r.sa}–${r.sb}`;
+      const teams = (k.aKnown && k.bKnown) ? `${k.a} vs ${k.b}` : '';
+      opt.textContent=`${k.roundName}${teams?`: ${teams}`:''} — ${r?`${r.sa}–${r.sb}`:'jokatu gabe'}`;
       og2.appendChild(opt);
     });
     sel.appendChild(og2);
@@ -1477,7 +1575,13 @@ window.fillAdminScore = () => {
   const sel=document.getElementById('admin-match-sel').value;
   if (!sel) return;
   const res = sel.startsWith('ko_') ? knockoutResults[sel.replace('ko_','')] : results[sel];
-  if (!sel.startsWith('ko_')) {
+  if (sel.startsWith('ko_')) {
+    const k=getKnockoutMatches().find(x=>'ko_'+x.id===sel);
+    if (k) {
+      document.getElementById('admin-label-a').textContent=k.aKnown?k.a.split(' / ')[0].toUpperCase():k.label;
+      document.getElementById('admin-label-b').textContent=k.bKnown?k.b.split(' / ')[0].toUpperCase():k.label;
+    }
+  } else {
     const m=SCHEDULE.find(s=>MATCH_KEY(s)===sel);
     if (m) {
       document.getElementById('admin-label-a').textContent=m.a.split(' / ')[0].toUpperCase();
